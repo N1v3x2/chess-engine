@@ -1,0 +1,221 @@
+#ifndef BOARD_H
+#define BOARD_H
+
+#include "Move.h"
+#include "Piece.h"
+#include <vector>
+
+using ui = unsigned int;
+using std::vector;
+
+const int mailbox[120] = {
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, 0,  1,  2,  3,  4,  5,  6,  7,  -1, -1, 8,  9,  10, 11, 12,
+    13, 14, 15, -1, -1, 16, 17, 18, 19, 20, 21, 22, 23, -1, -1, 24, 25, 26,
+    27, 28, 29, 30, 31, -1, -1, 32, 33, 34, 35, 36, 37, 38, 39, -1, -1, 40,
+    41, 42, 43, 44, 45, 46, 47, -1, -1, 48, 49, 50, 51, 52, 53, 54, 55, -1,
+    -1, 56, 57, 58, 59, 60, 61, 62, 63, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+const ui mailbox64[64] = {21, 22, 23, 24, 25, 26, 27, 28, 31, 32, 33, 34, 35,
+                          36, 37, 38, 41, 42, 43, 44, 45, 46, 47, 48, 51, 52,
+                          53, 54, 55, 56, 57, 58, 61, 62, 63, 64, 65, 66, 67,
+                          68, 71, 72, 73, 74, 75, 76, 77, 78, 81, 82, 83, 84,
+                          85, 86, 87, 88, 91, 92, 93, 94, 95, 96, 97, 98};
+
+// pawn, knight, bishop, rook, queen, king
+const bool doesSlide[6] = {false, false, true, true, true, false};
+const ui numOffsets[6] = {0, 8, 4, 4, 8, 8};
+const int offsets[6][8] = {
+    {0, 0, 0, 0, 0, 0, 0, 0},         {-21, -19, -12, -8, 8, 12, 19, 21},
+    {-11, -9, 9, 11, 0, 0, 0, 0},     {-10, -1, 1, 10, 0, 0, 0, 0},
+    {-11, -10, -9, -1, 1, 9, 10, 11}, {-11, -10, -9, -1, 1, 9, 10, 11}};
+
+class Board {
+  private:
+    PieceColor sideToPlay; // 0 = white, 1 = black
+    // No piece list for now
+    Piece board[64]{
+        P_WROOK, P_WKNIGHT, P_WBISHOP, P_WQUEEN, P_WKING, P_WBISHOP, P_WKNIGHT,
+        P_WROOK, P_WPAWN,   P_WPAWN,   P_WPAWN,  P_WPAWN, P_WPAWN,   P_WPAWN,
+        P_WPAWN, P_WPAWN,   P_EMPTY,   P_EMPTY,  P_EMPTY, P_EMPTY,   P_EMPTY,
+        P_EMPTY, P_EMPTY,   P_EMPTY,   P_EMPTY,  P_EMPTY, P_EMPTY,   P_EMPTY,
+        P_EMPTY, P_EMPTY,   P_EMPTY,   P_EMPTY,  P_EMPTY, P_EMPTY,   P_EMPTY,
+        P_EMPTY, P_EMPTY,   P_EMPTY,   P_EMPTY,  P_EMPTY, P_EMPTY,   P_EMPTY,
+        P_EMPTY, P_EMPTY,   P_EMPTY,   P_EMPTY,  P_EMPTY, P_EMPTY,   P_BPAWN,
+        P_BPAWN, P_BPAWN,   P_BPAWN,   P_BPAWN,  P_BPAWN, P_BPAWN,   P_BPAWN,
+        P_BROOK, P_BKNIGHT, P_BBISHOP, P_BQUEEN, P_BKING, P_BBISHOP, P_BKNIGHT,
+        P_BROOK,
+    };
+    vector<Move> gameList;
+
+    bool isAttacked(ui square) {
+        // Superpiece
+        int from;
+        for (int pieceType = 1; pieceType < 6; ++pieceType) {
+            for (ui j = 0; j < numOffsets[pieceType]; ++j) {
+                for (ui k = 1;; ++k) {
+                    from =
+                        mailbox[mailbox64[square] + k * offsets[pieceType][j]];
+                    if (from == -1) break; // Move would go off the board
+
+                    if (getPieceType(board[from]) ==
+                            (PieceType)(pieceType + 1) &&
+                        getPieceColor(board[from]) != sideToPlay)
+                        return true;
+
+                    if (!doesSlide[pieceType]) break;
+                }
+            }
+        }
+        // Check pawn attacks
+        int leftCaptureOffset = sideToPlay == PC_WHITE ? 9 : -11;
+        int rightCaptureOffset = sideToPlay == PC_BLACK ? 11 : -9;
+
+        for (auto captureOffset : {leftCaptureOffset, rightCaptureOffset}) {
+            from = mailbox[mailbox64[square] + captureOffset];
+            if (from != -1 && getPieceType(board[from]) == PT_PAWN) return true;
+        }
+
+        // En passant
+        if (gameList.size() > 0) {
+            Move& lastMove = gameList.back();
+            if (lastMove.isDoublePawnPush() &&
+                lastMove.getToSquare() == square) {
+
+                for (auto captureOffset : {-1, 1}) {
+                    from = mailbox[mailbox64[square] + captureOffset];
+                    if (from != -1 && getPieceType(board[from]) == PT_PAWN &&
+                        getPieceColor(board[from]) != sideToPlay)
+                        return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    vector<Move> generatePseudoLegalMoves() {
+        vector<Move> moves;
+
+        // Pawn offsets
+        int pushOffset = sideToPlay == PC_WHITE ? 10 : -10;
+        int leftCaptureOffset = sideToPlay == PC_WHITE ? 9 : -11;
+        int rightCaptureOffset = sideToPlay == PC_BLACK ? 11 : -9;
+
+        for (ui from = 0; from < 64; ++from) {
+            PieceType pieceType = getPieceType(board[from]);
+            if (pieceType == PT_EMPTY) continue;
+            if (getPieceColor(board[from]) == sideToPlay) {
+                int to;
+                if (pieceType == PT_PAWN) {
+                    // Push
+                    to = mailbox[mailbox64[from] + pushOffset];
+                    if (to != -1 && getPieceType(board[to]) == PT_EMPTY) {
+                        // Promotion
+                        if ((sideToPlay == PC_BLACK && to < 8) ||
+                            (sideToPlay == PC_WHITE && to >= 56)) {
+                            moves.emplace_back(from, to, MT_PROMOTION_KNIGHT,
+                                               board[from], board[to]);
+                            moves.emplace_back(from, to, MT_PROMOTION_BISHOP,
+                                               board[from], board[to]);
+                            moves.emplace_back(from, to, MT_PROMOTION_ROOK,
+                                               board[from], board[to]);
+                            moves.emplace_back(from, to, MT_PROMOTION_QUEEN,
+                                               board[from], board[to]);
+                        } else {
+                            moves.emplace_back(from, to, MT_QUIET, board[from],
+                                               board[to]);
+                        }
+
+                        // Double push
+                        if ((sideToPlay == PC_BLACK && from >= 48 &&
+                             from < 56) ||
+                            (sideToPlay == PC_WHITE && from >= 8 &&
+                             from < 16)) {
+                            to = mailbox[mailbox64[from] + 2 * pushOffset];
+                            if (getPieceType(board[to]) == PT_EMPTY) {
+                                moves.emplace_back(from, to,
+                                                   MT_DOUBLE_PAWN_PUSH,
+                                                   board[from], board[to]);
+                            }
+                        }
+                    }
+
+                    // Captures (white's perspective)
+                    for (auto captureOffset :
+                         {leftCaptureOffset, rightCaptureOffset}) {
+
+                        to = mailbox[mailbox64[from] + captureOffset];
+                        if (to != -1 && getPieceType(board[to]) != PT_EMPTY &&
+                            getPieceColor(board[to]) != sideToPlay) {
+                            // Promotion
+                            if ((sideToPlay == PC_BLACK && to < 8) ||
+                                (sideToPlay == PC_WHITE && to >= 56)) {
+                                moves.emplace_back(
+                                    from, to, MT_PROMOTION_KNIGHT | MT_CAPTURE,
+                                    board[from], board[to]);
+                                moves.emplace_back(
+                                    from, to, MT_PROMOTION_BISHOP | MT_CAPTURE,
+                                    board[from], board[to]);
+                                moves.emplace_back(
+                                    from, to, MT_PROMOTION_ROOK | MT_CAPTURE,
+                                    board[from], board[to]);
+                                moves.emplace_back(
+                                    from, to, MT_PROMOTION_QUEEN | MT_CAPTURE,
+                                    board[from], board[to]);
+                            } else {
+                                moves.emplace_back(from, to, MT_CAPTURE,
+                                                   board[from], board[to]);
+                            }
+                        }
+                    }
+
+                    // En passant
+                    if (!gameList.empty() &&
+                        gameList.back().isDoublePawnPush()) {
+                        ui lastSquare = gameList.back().getToSquare();
+                        if ((from > 0 && lastSquare == from - 1) ||
+                            (lastSquare == from + 1)) {
+                            to = lastSquare + (sideToPlay == PC_WHITE ? 8 : -8);
+                            moves.emplace_back(from, to, MT_CAPTURE_EP,
+                                               board[from], board[lastSquare]);
+                        }
+                    }
+
+                } else {
+                    for (ui j = 0; j < numOffsets[pieceType]; ++j) {
+                        for (ui k = 1;; ++k) {
+                            to = mailbox[mailbox64[from] +
+                                         k * offsets[pieceType][j]];
+                            if (to == -1) break; // Move would go off the board
+
+                            if (getPieceType(board[to]) == PT_EMPTY) {
+                                moves.emplace_back(from, to, MT_QUIET,
+                                                   board[from], board[to]);
+                            } else if (getPieceColor(board[to]) == sideToPlay) {
+                                break;
+                            } else {
+                                moves.emplace_back(from, to, MT_CAPTURE,
+                                                   board[from], board[to]);
+                            }
+
+                            if (!doesSlide[pieceType]) break;
+                        }
+                    }
+                    if (pieceType == PT_KING) {
+                        // NOTE: cannot castle through check; however, squares
+                        // outside the king's castle path can be attacked
+                        // NOTE: cannot castle if in check
+                    }
+                }
+            }
+        }
+
+        return moves;
+    }
+
+  public:
+    Board() : sideToPlay(PC_WHITE) {}
+};
+
+#endif // !BOARD_H
