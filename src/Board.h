@@ -240,9 +240,56 @@ class Board {
                         // NOTE: cannot castle through check; however, squares
                         // outside the king's castle path can be attacked
                         GameState state = gameStateStack.top();
+                        vector<ui> kingSquares;
+                        bool pathEmpty;
+
                         if (state.canKingsideCastle(sideToPlay)) {
+                            if (sideToPlay == PC_WHITE)
+                                kingSquares = {5, 6};
+                            else
+                                kingSquares = {61, 62};
+
+                            pathEmpty = true;
+                            for (auto square : kingSquares) {
+                                if (getPieceType(board[square]) != PT_EMPTY ||
+                                    isAttacked(square)) {
+                                    pathEmpty = false;
+                                    break;
+                                }
+                            }
+                            if (pathEmpty) {
+                                moves.emplace_back(from, from + 2,
+                                                   MT_CASTLE_KING, board[from],
+                                                   board[to]);
+                            }
                         }
                         if (state.canQueensideCastle(sideToPlay)) {
+                            if (sideToPlay == PC_WHITE)
+                                kingSquares = {2, 3};
+                            else
+                                kingSquares = {58, 59};
+
+                            pathEmpty = true;
+                            for (auto square : kingSquares) {
+                                if (getPieceType(board[square]) != PT_EMPTY ||
+                                    isAttacked(square)) {
+                                    pathEmpty = false;
+                                    break;
+                                }
+                            }
+                            if (sideToPlay == PC_WHITE &&
+                                getPieceType(board[1]) != PT_EMPTY)
+                                pathEmpty = false;
+
+                            if (sideToPlay == PC_BLACK &&
+                                getPieceType(board[57]) != PT_EMPTY)
+                                pathEmpty = false;
+
+                            if (pathEmpty) {
+                                moves.emplace_back(from, from + 2,
+                                                   MT_CASTLE_QUEEN, board[from],
+                                                   board[to]);
+                            }
                         }
                     }
                 }
