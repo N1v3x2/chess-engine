@@ -28,6 +28,7 @@ class Move {
         : from(from), to(to), flags(flags), fromPiece(p1), toPiece(p2) {}
 
     Piece getFromPiece() { return fromPiece; }
+    PieceType getFromPieceType() { return getPieceType(fromPiece); }
     Piece getToPiece() { return toPiece; }
     ui getFromSquare() { return from; }
     ui getToSquare() { return to; }

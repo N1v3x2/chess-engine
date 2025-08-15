@@ -115,8 +115,7 @@ class Board {
         }
 
         // En passant
-        if (gameStateStack.size() > 0 &&
-            gameStateStack.top().epSquare == (int)square) {
+        if (gameStateStack.top().epSquare == (int)square) {
             for (auto captureOffset : {-1, 1}) {
                 from = mailbox[mailbox64[square] + captureOffset];
                 if (from != -1 && getPieceType(board[from]) == PT_PAWN &&
@@ -205,8 +204,7 @@ class Board {
                     }
 
                     // En passant
-                    if (gameStateStack.size() > 0 &&
-                        gameStateStack.top().epSquare != -1) {
+                    if (gameStateStack.top().epSquare != -1) {
                         int epSquare = gameStateStack.top().epSquare;
                         if (abs(gameStateStack.top().epSquare - (int)from) ==
                             1) {
@@ -237,8 +235,9 @@ class Board {
                     }
                     // NOTE: cannot castle out of check
                     if (pieceType == PT_KING && !isAttacked(from)) {
-                        // NOTE: cannot castle through check; however, squares
-                        // outside the king's castle path can be attacked
+                        // NOTE: cannot castle through attacked square; however,
+                        // squares outside the king's castle path can be
+                        // attacked
                         GameState state = gameStateStack.top();
                         vector<ui> kingSquares;
                         bool pathEmpty;
@@ -300,7 +299,78 @@ class Board {
     }
 
   public:
-    Board() : sideToPlay(PC_WHITE) {}
+    Board() : sideToPlay(PC_WHITE) { gameStateStack.emplace(); }
+
+    // No legality checks for now. Let's assume the move is legal
+    void makeMove(Move& move) {
+        Piece piece;
+        GameState newState = gameStateStack.top();
+        newState.epSquare = -1;
+
+        if (move.getFromPieceType() == PT_PAWN) {
+            newState.halfmoveClock = 0;
+            piece = move.getFromPiece();
+
+            if (move.isDoublePawnPush()) {
+                newState.epSquare = move.getToSquare();
+            }
+
+            if (move.isEnpassantCapture()) {
+                int offset = sideToPlay == PC_WHITE ? -8 : 8;
+                board[move.getToSquare() + offset] = P_EMPTY;
+            }
+
+            if (move.isKnightPromotion())
+                piece = sideToPlay == PC_WHITE ? P_WKNIGHT : P_BKNIGHT;
+            else if (move.isBishopPromotion())
+                piece = sideToPlay == PC_WHITE ? P_WBISHOP : P_BBISHOP;
+            else if (move.isRookPromotion())
+                piece = sideToPlay == PC_WHITE ? P_WROOK : P_BROOK;
+            else
+                piece = sideToPlay == PC_WHITE ? P_WQUEEN : P_BQUEEN;
+        } else {
+            newState.halfmoveClock += 1;
+            piece = move.getFromPiece();
+
+            if (move.getFromPieceType() == PT_KING) {
+                newState.removeKingsideCastlingRights(sideToPlay);
+                newState.removeQueensideCastlingRights(sideToPlay);
+
+                if (move.isKingSideCastle()) {
+                    board[move.getToSquare() - 1] =
+                        sideToPlay == PC_WHITE ? P_WROOK : P_BROOK;
+                    board[move.getToSquare() + 1] = P_EMPTY;
+                }
+
+                if (move.isQueenSideCastle()) {
+                    board[move.getToSquare() + 1] =
+                        sideToPlay == PC_WHITE ? P_WROOK : P_BROOK;
+                    board[move.getToSquare() - 2] = P_EMPTY;
+                }
+            }
+
+            if (move.getFromPieceType() == PT_ROOK) {
+                // TODO: handle castling rights
+            }
+        }
+
+        board[move.getToSquare()] = piece;
+        board[move.getFromSquare()] = P_EMPTY;
+    }
+
+    void unmakeMove() {}
+
+    // Possible optimization: work with linked list to efficiently remove
+    // illegal moves
+    vector<Move> generateMoves() {
+        vector<Move> pseudo = generatePseudoLegalMoves();
+        vector<Move> legal;
+
+        for (auto move : pseudo) {
+        }
+
+        return legal;
+    }
 };
 
 #endif // !BOARD_H
