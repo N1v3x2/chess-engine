@@ -3,12 +3,15 @@
 
 #include "Move.h"
 #include "Piece.h"
+#include <cmath>
+#include <stack>
 #include <vector>
 
 using ui = unsigned int;
+using std::stack;
 using std::vector;
 
-const int mailbox[120] = {
+constexpr int mailbox[120] = {
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
     -1, -1, -1, 0,  1,  2,  3,  4,  5,  6,  7,  -1, -1, 8,  9,  10, 11, 12,
     13, 14, 15, -1, -1, 16, 17, 18, 19, 20, 21, 22, 23, -1, -1, 24, 25, 26,
@@ -16,22 +19,54 @@ const int mailbox[120] = {
     41, 42, 43, 44, 45, 46, 47, -1, -1, 48, 49, 50, 51, 52, 53, 54, 55, -1,
     -1, 56, 57, 58, 59, 60, 61, 62, 63, -1, -1, -1, -1, -1, -1, -1, -1, -1,
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
-const ui mailbox64[64] = {21, 22, 23, 24, 25, 26, 27, 28, 31, 32, 33, 34, 35,
-                          36, 37, 38, 41, 42, 43, 44, 45, 46, 47, 48, 51, 52,
-                          53, 54, 55, 56, 57, 58, 61, 62, 63, 64, 65, 66, 67,
-                          68, 71, 72, 73, 74, 75, 76, 77, 78, 81, 82, 83, 84,
-                          85, 86, 87, 88, 91, 92, 93, 94, 95, 96, 97, 98};
+constexpr ui mailbox64[64] = {
+    21, 22, 23, 24, 25, 26, 27, 28, 31, 32, 33, 34, 35, 36, 37, 38,
+    41, 42, 43, 44, 45, 46, 47, 48, 51, 52, 53, 54, 55, 56, 57, 58,
+    61, 62, 63, 64, 65, 66, 67, 68, 71, 72, 73, 74, 75, 76, 77, 78,
+    81, 82, 83, 84, 85, 86, 87, 88, 91, 92, 93, 94, 95, 96, 97, 98};
 
 // pawn, knight, bishop, rook, queen, king
-const bool doesSlide[6] = {false, false, true, true, true, false};
-const ui numOffsets[6] = {0, 8, 4, 4, 8, 8};
-const int offsets[6][8] = {
+constexpr bool doesSlide[6] = {false, false, true, true, true, false};
+constexpr ui numOffsets[6] = {0, 8, 4, 4, 8, 8};
+constexpr int offsets[6][8] = {
     {0, 0, 0, 0, 0, 0, 0, 0},         {-21, -19, -12, -8, 8, 12, 19, 21},
     {-11, -9, 9, 11, 0, 0, 0, 0},     {-10, -1, 1, 10, 0, 0, 0, 0},
     {-11, -10, -9, -1, 1, 9, 10, 11}, {-11, -10, -9, -1, 1, 9, 10, 11}};
 
 class Board {
   private:
+    struct GameState {
+      private:
+        bool canWhiteQueensideCastle = true;
+        bool canWhiteKingsideCastle = true;
+        bool canBlackQueensideCastle = true;
+        bool canBlackKingsideCastle = true;
+
+      public:
+        int epSquare = -1;
+        int halfmoveClock = 0; // Capture, pawn move, castle
+        bool canKingsideCastle(PieceColor side) {
+            return side == PC_WHITE ? canWhiteKingsideCastle
+                                    : canBlackKingsideCastle;
+        }
+        bool canQueensideCastle(PieceColor side) {
+            return side == PC_WHITE ? canWhiteQueensideCastle
+                                    : canBlackQueensideCastle;
+        }
+        void removeKingsideCastlingRights(PieceColor side) {
+            if (side == PC_WHITE)
+                canWhiteKingsideCastle = false;
+            else
+                canBlackKingsideCastle = false;
+        }
+        void removeQueensideCastlingRights(PieceColor side) {
+            if (side == PC_WHITE)
+                canWhiteQueensideCastle = false;
+            else
+                canBlackQueensideCastle = false;
+        }
+    };
+
     PieceColor sideToPlay; // 0 = white, 1 = black
     // No piece list for now
     Piece board[64]{
@@ -47,6 +82,9 @@ class Board {
         P_BROOK,
     };
     vector<Move> gameList;
+    stack<GameState> gameStateStack;
+
+    // TODO: add map of zobrist keys to track three-fold repetition
 
     bool isAttacked(ui square) {
         // Superpiece
@@ -77,17 +115,13 @@ class Board {
         }
 
         // En passant
-        if (gameList.size() > 0) {
-            Move& lastMove = gameList.back();
-            if (lastMove.isDoublePawnPush() &&
-                lastMove.getToSquare() == square) {
-
-                for (auto captureOffset : {-1, 1}) {
-                    from = mailbox[mailbox64[square] + captureOffset];
-                    if (from != -1 && getPieceType(board[from]) == PT_PAWN &&
-                        getPieceColor(board[from]) != sideToPlay)
-                        return true;
-                }
+        if (gameStateStack.size() > 0 &&
+            gameStateStack.top().epSquare == (int)square) {
+            for (auto captureOffset : {-1, 1}) {
+                from = mailbox[mailbox64[square] + captureOffset];
+                if (from != -1 && getPieceType(board[from]) == PT_PAWN &&
+                    getPieceColor(board[from]) != sideToPlay)
+                    return true;
             }
         }
 
@@ -171,17 +205,16 @@ class Board {
                     }
 
                     // En passant
-                    if (!gameList.empty() &&
-                        gameList.back().isDoublePawnPush()) {
-                        ui lastSquare = gameList.back().getToSquare();
-                        if ((from > 0 && lastSquare == from - 1) ||
-                            (lastSquare == from + 1)) {
-                            to = lastSquare + (sideToPlay == PC_WHITE ? 8 : -8);
+                    if (gameStateStack.size() > 0 &&
+                        gameStateStack.top().epSquare != -1) {
+                        int epSquare = gameStateStack.top().epSquare;
+                        if (abs(gameStateStack.top().epSquare - (int)from) ==
+                            1) {
+                            to = epSquare + (sideToPlay == PC_WHITE ? 8 : -8);
                             moves.emplace_back(from, to, MT_CAPTURE_EP,
-                                               board[from], board[lastSquare]);
+                                               board[from], board[epSquare]);
                         }
                     }
-
                 } else {
                     for (ui j = 0; j < numOffsets[pieceType]; ++j) {
                         for (ui k = 1;; ++k) {
@@ -202,10 +235,15 @@ class Board {
                             if (!doesSlide[pieceType]) break;
                         }
                     }
-                    if (pieceType == PT_KING) {
+                    // NOTE: cannot castle out of check
+                    if (pieceType == PT_KING && !isAttacked(from)) {
                         // NOTE: cannot castle through check; however, squares
                         // outside the king's castle path can be attacked
-                        // NOTE: cannot castle if in check
+                        GameState state = gameStateStack.top();
+                        if (state.canKingsideCastle(sideToPlay)) {
+                        }
+                        if (state.canQueensideCastle(sideToPlay)) {
+                        }
                     }
                 }
             }
