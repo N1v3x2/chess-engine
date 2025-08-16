@@ -5,9 +5,11 @@
 #include "Piece.h"
 #include <cmath>
 #include <stack>
+#include <stdexcept>
 #include <vector>
 
 using ui = unsigned int;
+using std::runtime_error;
 using std::stack;
 using std::vector;
 
@@ -43,6 +45,7 @@ class Board {
         bool canBlackKingsideCastle = true;
 
       public:
+        Piece epCapturedPiece = P_EMPTY;
         int epSquare = -1;
         int halfmoveClock = 0; // Capture, pawn move, castle
         bool canKingsideCastle(PieceColor side) {
@@ -125,6 +128,19 @@ class Board {
         }
 
         return false;
+    }
+
+    bool isInCheck() {
+        int kingSquare = -1;
+        for (ui i = 0; i < 64; ++i) {
+            if ((sideToPlay == PC_WHITE && board[i] == P_WKING) ||
+                (sideToPlay == PC_BLACK && board[i] == P_BKING)) {
+                kingSquare = i;
+                break;
+            }
+        }
+        if (kingSquare == -1) throw runtime_error("King not found");
+        return isAttacked(kingSquare);
     }
 
     vector<Move> generatePseudoLegalMoves() {
@@ -317,7 +333,9 @@ class Board {
 
             if (move.isEnpassantCapture()) {
                 int offset = sideToPlay == PC_WHITE ? -8 : 8;
-                board[move.getToSquare() + offset] = P_EMPTY;
+                ui epSquare = move.getToSquare() + offset;
+                newState.epCapturedPiece = board[epSquare];
+                board[epSquare] = P_EMPTY;
             }
 
             if (move.isKnightPromotion())
@@ -326,7 +344,7 @@ class Board {
                 piece = sideToPlay == PC_WHITE ? P_WBISHOP : P_BBISHOP;
             else if (move.isRookPromotion())
                 piece = sideToPlay == PC_WHITE ? P_WROOK : P_BROOK;
-            else
+            else if (move.isQueenPromotion())
                 piece = sideToPlay == PC_WHITE ? P_WQUEEN : P_BQUEEN;
         } else {
             newState.halfmoveClock += 1;
@@ -337,12 +355,14 @@ class Board {
                 newState.removeQueensideCastlingRights(sideToPlay);
 
                 if (move.isKingSideCastle()) {
+                    newState.halfmoveClock = 0;
                     board[move.getToSquare() - 1] =
                         sideToPlay == PC_WHITE ? P_WROOK : P_BROOK;
                     board[move.getToSquare() + 1] = P_EMPTY;
                 }
 
                 if (move.isQueenSideCastle()) {
+                    newState.halfmoveClock = 0;
                     board[move.getToSquare() + 1] =
                         sideToPlay == PC_WHITE ? P_WROOK : P_BROOK;
                     board[move.getToSquare() - 2] = P_EMPTY;
@@ -350,15 +370,48 @@ class Board {
             }
 
             if (move.getFromPieceType() == PT_ROOK) {
-                // TODO: handle castling rights
+                if (move.getFromSquare() == 7)
+                    newState.removeKingsideCastlingRights(PC_WHITE);
+                if (move.getFromSquare() == 0)
+                    newState.removeQueensideCastlingRights(PC_WHITE);
+                if (move.getFromSquare() == 63)
+                    newState.removeKingsideCastlingRights(PC_BLACK);
+                if (move.getFromSquare() == 56)
+                    newState.removeQueensideCastlingRights(PC_BLACK);
             }
         }
 
         board[move.getToSquare()] = piece;
         board[move.getFromSquare()] = P_EMPTY;
+        gameStateStack.push(newState);
+        gameList.push_back(move);
+        sideToPlay = (PieceColor)!sideToPlay;
     }
 
-    void unmakeMove() {}
+    void unmakeMove() {
+        GameState state = gameStateStack.top();
+        gameStateStack.pop();
+        Move move = gameList.back();
+        gameList.pop_back();
+
+        if (move.isEnpassantCapture()) {
+            int offset = sideToPlay == PC_WHITE ? -8 : 8;
+            board[move.getToSquare() + offset] = state.epCapturedPiece;
+        }
+        if (move.isKingSideCastle()) {
+            board[move.getToSquare() - 1] = P_EMPTY;
+            board[move.getToSquare() + 1] =
+                sideToPlay == PC_WHITE ? P_WROOK : P_BROOK;
+        }
+        if (move.isQueenSideCastle()) {
+            board[move.getToSquare() + 1] = P_EMPTY;
+            board[move.getToSquare() - 2] =
+                sideToPlay == PC_WHITE ? P_WROOK : P_BROOK;
+        }
+
+        board[move.getFromSquare()] = move.getFromPiece();
+        board[move.getToSquare()] = move.getToPiece();
+    }
 
     // Possible optimization: work with linked list to efficiently remove
     // illegal moves
@@ -366,7 +419,10 @@ class Board {
         vector<Move> pseudo = generatePseudoLegalMoves();
         vector<Move> legal;
 
-        for (auto move : pseudo) {
+        for (auto& move : pseudo) {
+            makeMove(move);
+            if (!isInCheck()) legal.push_back(move);
+            unmakeMove();
         }
 
         return legal;
