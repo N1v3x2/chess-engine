@@ -1,17 +1,22 @@
 #ifndef BOARD_H
 #define BOARD_H
 
+#include "Graphics.h"
 #include "Move.h"
 #include "Piece.h"
+
 #include <cmath>
+#include <iostream>
 #include <stack>
 #include <stdexcept>
 #include <vector>
 
-using ui = unsigned int;
+using std::cout;
 using std::runtime_error;
 using std::stack;
 using std::vector;
+
+using ui = unsigned int;
 
 constexpr int mailbox[120] = {
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
@@ -87,7 +92,8 @@ class Board {
     vector<Move> gameList;
     stack<GameState> gameStateStack;
 
-    // TODO: add map of zobrist keys to track three-fold repetition
+    // TODO: add map of zobrist keys to handle three-fold repetition
+    // TODO: handle game end conditions (draw, lose)
 
     bool isAttacked(ui square) {
         // Superpiece
@@ -426,6 +432,22 @@ class Board {
         }
 
         return legal;
+    }
+
+    void printBoard() {
+        cout << term::CLEAR << term::HOME;
+        cout << "   ┌───┬───┬───┬───┬───┬───┬───┬───┐\n";
+        int k;
+        for (int i = 7; i >= 0; --i) {
+            cout << " " << i + 1 << " │";
+            for (int j = 0; j < 8; ++j) {
+                k = 8 * i + j;
+                cout << " " << glyph.at(board[k]) << " │";
+            }
+            if (i > 0) cout << "\n   ├───┼───┼───┼───┼───┼───┼───┼───┤\n";
+        }
+        cout << "\n   └───┴───┴───┴───┴───┴───┴───┴───┘\n";
+        cout << "     a   b   c   d   e   f   g   h\n";
     }
 };
 

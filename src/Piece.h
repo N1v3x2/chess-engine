@@ -38,9 +38,9 @@ enum Piece {
     P_BKING = BOFFSET | PT_KING,
 };
 
-PieceColor getPieceColor(Piece p) {
+constexpr PieceColor getPieceColor(Piece p) {
     return (p & BOFFSET) ? PC_BLACK : PC_WHITE;
 }
-PieceType getPieceType(Piece p) { p & ~BOFFSET; }
+constexpr PieceType getPieceType(Piece p) { return (PieceType)(p & ~BOFFSET); }
 
 #endif // !PIECE_H
