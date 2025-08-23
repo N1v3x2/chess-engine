@@ -3,17 +3,21 @@
 
 #include "Graphics.h"
 #include "Move.h"
+#include "MoveParser.h"
 #include "Piece.h"
 
 #include <cmath>
 #include <iostream>
 #include <stack>
 #include <stdexcept>
+#include <unordered_map>
 #include <vector>
 
 using std::cout;
+using std::invalid_argument;
 using std::runtime_error;
 using std::stack;
+using std::unordered_map;
 using std::vector;
 
 using ui = unsigned int;
@@ -149,8 +153,8 @@ class Board {
         return isAttacked(kingSquare);
     }
 
-    vector<Move> generatePseudoLegalMoves() {
-        vector<Move> moves;
+    unordered_map<string, Move> generatePseudoLegalMoves() {
+        unordered_map<string, Move> moves;
 
         // Pawn offsets
         int pushOffset = sideToPlay == PC_WHITE ? 10 : -10;
@@ -169,17 +173,24 @@ class Board {
                         // Promotion
                         if ((sideToPlay == PC_BLACK && to < 8) ||
                             (sideToPlay == PC_WHITE && to >= 56)) {
-                            moves.emplace_back(from, to, MT_PROMOTION_KNIGHT,
-                                               board[from], board[to]);
-                            moves.emplace_back(from, to, MT_PROMOTION_BISHOP,
-                                               board[from], board[to]);
-                            moves.emplace_back(from, to, MT_PROMOTION_ROOK,
-                                               board[from], board[to]);
-                            moves.emplace_back(from, to, MT_PROMOTION_QUEEN,
-                                               board[from], board[to]);
+                            Move m(from, to, MT_PROMOTION_KNIGHT, board[from],
+                                   board[to]);
+                            moves[m.getCoordinateNotation()] = m;
+
+                            m = Move(from, to, MT_PROMOTION_BISHOP, board[from],
+                                     board[to]);
+                            moves[m.getCoordinateNotation()] = m;
+
+                            m = Move(from, to, MT_PROMOTION_ROOK, board[from],
+                                     board[to]);
+                            moves[m.getCoordinateNotation()] = m;
+
+                            m = Move(from, to, MT_PROMOTION_QUEEN, board[from],
+                                     board[to]);
+                            moves[m.getCoordinateNotation()] = m;
                         } else {
-                            moves.emplace_back(from, to, MT_QUIET, board[from],
-                                               board[to]);
+                            Move m(from, to, MT_QUIET, board[from], board[to]);
+                            moves[m.getCoordinateNotation()] = m;
                         }
 
                         // Double push
@@ -189,9 +200,9 @@ class Board {
                              from < 16)) {
                             to = mailbox[mailbox64[from] + 2 * pushOffset];
                             if (getPieceType(board[to]) == PT_EMPTY) {
-                                moves.emplace_back(from, to,
-                                                   MT_DOUBLE_PAWN_PUSH,
-                                                   board[from], board[to]);
+                                Move m(from, to, MT_DOUBLE_PAWN_PUSH,
+                                       board[from], board[to]);
+                                moves[m.getCoordinateNotation()] = m;
                             }
                         }
                     }
@@ -206,21 +217,29 @@ class Board {
                             // Promotion
                             if ((sideToPlay == PC_BLACK && to < 8) ||
                                 (sideToPlay == PC_WHITE && to >= 56)) {
-                                moves.emplace_back(
-                                    from, to, MT_PROMOTION_KNIGHT | MT_CAPTURE,
-                                    board[from], board[to]);
-                                moves.emplace_back(
-                                    from, to, MT_PROMOTION_BISHOP | MT_CAPTURE,
-                                    board[from], board[to]);
-                                moves.emplace_back(
-                                    from, to, MT_PROMOTION_ROOK | MT_CAPTURE,
-                                    board[from], board[to]);
-                                moves.emplace_back(
-                                    from, to, MT_PROMOTION_QUEEN | MT_CAPTURE,
-                                    board[from], board[to]);
+                                Move m(from, to,
+                                       MT_PROMOTION_KNIGHT | MT_CAPTURE,
+                                       board[from], board[to]);
+                                moves[m.getCoordinateNotation()] = m;
+
+                                m = Move(from, to,
+                                         MT_PROMOTION_BISHOP | MT_CAPTURE,
+                                         board[from], board[to]);
+                                moves[m.getCoordinateNotation()] = m;
+
+                                m = Move(from, to,
+                                         MT_PROMOTION_ROOK | MT_CAPTURE,
+                                         board[from], board[to]);
+                                moves[m.getCoordinateNotation()] = m;
+
+                                m = Move(from, to,
+                                         MT_PROMOTION_QUEEN | MT_CAPTURE,
+                                         board[from], board[to]);
+                                moves[m.getCoordinateNotation()] = m;
                             } else {
-                                moves.emplace_back(from, to, MT_CAPTURE,
-                                                   board[from], board[to]);
+                                Move m(from, to, MT_CAPTURE, board[from],
+                                       board[to]);
+                                moves[m.getCoordinateNotation()] = m;
                             }
                         }
                     }
@@ -231,8 +250,9 @@ class Board {
                         if (abs(gameStateStack.top().epSquare - (int)from) ==
                             1) {
                             to = epSquare + (sideToPlay == PC_WHITE ? 8 : -8);
-                            moves.emplace_back(from, to, MT_CAPTURE_EP,
-                                               board[from], board[epSquare]);
+                            Move m(from, to, MT_CAPTURE_EP, board[from],
+                                   board[epSquare]);
+                            moves[m.getCoordinateNotation()] = m;
                         }
                     }
                 } else {
@@ -243,13 +263,15 @@ class Board {
                             if (to == -1) break; // Move would go off the board
 
                             if (getPieceType(board[to]) == PT_EMPTY) {
-                                moves.emplace_back(from, to, MT_QUIET,
-                                                   board[from], board[to]);
+                                Move m(from, to, MT_QUIET, board[from],
+                                       board[to]);
+                                moves[m.getCoordinateNotation()] = m;
                             } else if (getPieceColor(board[to]) == sideToPlay) {
                                 break;
                             } else {
-                                moves.emplace_back(from, to, MT_CAPTURE,
-                                                   board[from], board[to]);
+                                Move m(from, to, MT_CAPTURE, board[from],
+                                       board[to]);
+                                moves[m.getCoordinateNotation()] = m;
                             }
 
                             if (!doesSlide[pieceType]) break;
@@ -279,9 +301,9 @@ class Board {
                                 }
                             }
                             if (pathEmpty) {
-                                moves.emplace_back(from, from + 2,
-                                                   MT_CASTLE_KING, board[from],
-                                                   board[to]);
+                                Move m(from, from + 2, MT_CASTLE_KING,
+                                       board[from], board[to]);
+                                moves[m.getCoordinateNotation()] = m;
                             }
                         }
                         if (state.canQueensideCastle(sideToPlay)) {
@@ -307,9 +329,9 @@ class Board {
                                 pathEmpty = false;
 
                             if (pathEmpty) {
-                                moves.emplace_back(from, from + 2,
-                                                   MT_CASTLE_QUEEN, board[from],
-                                                   board[to]);
+                                Move m(from, from + 2, MT_CASTLE_QUEEN,
+                                       board[from], board[to]);
+                                moves[m.getCoordinateNotation()] = m;
                             }
                         }
                     }
@@ -421,13 +443,13 @@ class Board {
 
     // Possible optimization: work with linked list to efficiently remove
     // illegal moves
-    vector<Move> generateMoves() {
-        vector<Move> pseudo = generatePseudoLegalMoves();
-        vector<Move> legal;
+    unordered_map<string, Move> generateMoves() {
+        unordered_map<string, Move> pseudo = generatePseudoLegalMoves();
+        unordered_map<string, Move> legal;
 
-        for (auto& move : pseudo) {
+        for (auto& [notation, move] : pseudo) {
             makeMove(move);
-            if (!isInCheck()) legal.push_back(move);
+            if (!isInCheck()) legal[notation] = move;
             unmakeMove();
         }
 
@@ -435,8 +457,7 @@ class Board {
     }
 
     void printBoard() {
-        cout << term::CLEAR << term::HOME;
-        cout << '\n';
+        cout << term::CLEAR << term::HOME << '\n';
         int k;
         bool darkBg, darkPiece;
         for (int i = 7; i >= 0; --i) {
@@ -452,6 +473,35 @@ class Board {
             cout << '\n';
         }
         cout << "    a  b  c  d  e  f  g  h\n";
+    }
+
+    Move parseMove(string move, unordered_map<string, Move>& legalMoves) {
+        if (move.size() < 4 || move.size() > 5)
+            throw invalid_argument("Invalid input length.");
+
+        ui from = convertStringToSquare(move.substr(0, 2));
+        ui to = convertStringToSquare(move.substr(2, 2));
+
+        if (from < 0 || from > 63)
+            throw invalid_argument("From square out of bounds.");
+
+        if (to < 0 || to > 63)
+            throw invalid_argument("To square out of bounds.");
+
+        if (getPieceType(board[from]) == PT_EMPTY)
+            throw invalid_argument("Cannot move empty square.");
+
+        if (getPieceColor(board[from]) != sideToPlay)
+            throw invalid_argument("Cannot move opponent's pieces.");
+
+        if (getPieceType(board[from]) == PT_PAWN && to >= 56 &&
+            move.size() == 4)
+            throw invalid_argument("Must promote pawn on last rank.");
+
+        if (!legalMoves.count(move))
+            throw invalid_argument("Must make legal move.");
+
+        return legalMoves[move];
     }
 };
 

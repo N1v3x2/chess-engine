@@ -2,6 +2,10 @@
 #define MOVE_H
 
 #include "Piece.h"
+#include <string>
+
+using std::string;
+using std::to_string;
 
 using ui = unsigned int;
 
@@ -23,6 +27,9 @@ class Move {
     ui from, to, flags;
     Piece fromPiece, toPiece;
 
+    static string getFile(ui square) { return to_string(square % 8); }
+    static string getRank(ui square) { return to_string(square / 8 + 1); }
+
   public:
     Move(ui from, ui to, int flags, Piece p1, Piece p2)
         : from(from), to(to), flags(flags), fromPiece(p1), toPiece(p2) {}
@@ -42,6 +49,21 @@ class Move {
     bool isBishopPromotion() { return flags & MT_PROMOTION_BISHOP; }
     bool isRookPromotion() { return flags & MT_PROMOTION_ROOK; }
     bool isQueenPromotion() { return flags & MT_PROMOTION_QUEEN; }
+
+    string getCoordinateNotation() {
+        string fromSquare = getFile(from) + getRank(from);
+        string toSquare = getFile(to) + getRank(to);
+        string promotionPiece;
+        if (isKnightPromotion())
+            promotionPiece = "n";
+        else if (isBishopPromotion())
+            promotionPiece = "b";
+        else if (isRookPromotion())
+            promotionPiece = "r";
+        else if (isQueenPromotion())
+            promotionPiece = "q";
+        return fromSquare + toSquare + promotionPiece;
+    }
 };
 
 #endif // !MOVE_H
