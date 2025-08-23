@@ -436,18 +436,22 @@ class Board {
 
     void printBoard() {
         cout << term::CLEAR << term::HOME;
-        cout << "   ┌───┬───┬───┬───┬───┬───┬───┬───┐\n";
+        cout << '\n';
         int k;
+        bool darkBg, darkPiece;
         for (int i = 7; i >= 0; --i) {
-            cout << " " << i + 1 << " │";
+            cout << " " << i + 1 << " ";
             for (int j = 0; j < 8; ++j) {
                 k = 8 * i + j;
-                cout << " " << glyph.at(board[k]) << " │";
+                darkBg = (k + i) % 2;
+                darkPiece = getPieceColor(board[k]) == PC_BLACK;
+                cout << (darkBg ? term::DARK_SQUARE : term::LIGHT_SQUARE) << " "
+                     << (darkPiece ? term::DARK_TEXT : term::LIGHT_TEXT)
+                     << glyph.at(getPieceType(board[k])) << " " << term::RESET;
             }
-            if (i > 0) cout << "\n   ├───┼───┼───┼───┼───┼───┼───┼───┤\n";
+            cout << '\n';
         }
-        cout << "\n   └───┴───┴───┴───┴───┴───┴───┴───┘\n";
-        cout << "     a   b   c   d   e   f   g   h\n";
+        cout << "    a  b  c  d  e  f  g  h\n";
     }
 };
 
