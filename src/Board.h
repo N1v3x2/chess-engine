@@ -175,22 +175,22 @@ class Board {
                             (sideToPlay == PC_WHITE && to >= 56)) {
                             Move m(from, to, MT_PROMOTION_KNIGHT, board[from],
                                    board[to]);
-                            moves[m.getCoordinateNotation()] = m;
+                            moves.emplace(m.getCoordinateNotation(), m);
 
                             m = Move(from, to, MT_PROMOTION_BISHOP, board[from],
                                      board[to]);
-                            moves[m.getCoordinateNotation()] = m;
+                            moves.emplace(m.getCoordinateNotation(), m);
 
                             m = Move(from, to, MT_PROMOTION_ROOK, board[from],
                                      board[to]);
-                            moves[m.getCoordinateNotation()] = m;
+                            moves.emplace(m.getCoordinateNotation(), m);
 
                             m = Move(from, to, MT_PROMOTION_QUEEN, board[from],
                                      board[to]);
-                            moves[m.getCoordinateNotation()] = m;
+                            moves.emplace(m.getCoordinateNotation(), m);
                         } else {
                             Move m(from, to, MT_QUIET, board[from], board[to]);
-                            moves[m.getCoordinateNotation()] = m;
+                            moves.emplace(m.getCoordinateNotation(), m);
                         }
 
                         // Double push
@@ -202,7 +202,7 @@ class Board {
                             if (getPieceType(board[to]) == PT_EMPTY) {
                                 Move m(from, to, MT_DOUBLE_PAWN_PUSH,
                                        board[from], board[to]);
-                                moves[m.getCoordinateNotation()] = m;
+                                moves.emplace(m.getCoordinateNotation(), m);
                             }
                         }
                     }
@@ -220,26 +220,26 @@ class Board {
                                 Move m(from, to,
                                        MT_PROMOTION_KNIGHT | MT_CAPTURE,
                                        board[from], board[to]);
-                                moves[m.getCoordinateNotation()] = m;
+                                moves.emplace(m.getCoordinateNotation(), m);
 
                                 m = Move(from, to,
                                          MT_PROMOTION_BISHOP | MT_CAPTURE,
                                          board[from], board[to]);
-                                moves[m.getCoordinateNotation()] = m;
+                                moves.emplace(m.getCoordinateNotation(), m);
 
                                 m = Move(from, to,
                                          MT_PROMOTION_ROOK | MT_CAPTURE,
                                          board[from], board[to]);
-                                moves[m.getCoordinateNotation()] = m;
+                                moves.emplace(m.getCoordinateNotation(), m);
 
                                 m = Move(from, to,
                                          MT_PROMOTION_QUEEN | MT_CAPTURE,
                                          board[from], board[to]);
-                                moves[m.getCoordinateNotation()] = m;
+                                moves.emplace(m.getCoordinateNotation(), m);
                             } else {
                                 Move m(from, to, MT_CAPTURE, board[from],
                                        board[to]);
-                                moves[m.getCoordinateNotation()] = m;
+                                moves.emplace(m.getCoordinateNotation(), m);
                             }
                         }
                     }
@@ -252,7 +252,7 @@ class Board {
                             to = epSquare + (sideToPlay == PC_WHITE ? 8 : -8);
                             Move m(from, to, MT_CAPTURE_EP, board[from],
                                    board[epSquare]);
-                            moves[m.getCoordinateNotation()] = m;
+                            moves.emplace(m.getCoordinateNotation(), m);
                         }
                     }
                 } else {
@@ -265,13 +265,13 @@ class Board {
                             if (getPieceType(board[to]) == PT_EMPTY) {
                                 Move m(from, to, MT_QUIET, board[from],
                                        board[to]);
-                                moves[m.getCoordinateNotation()] = m;
+                                moves.emplace(m.getCoordinateNotation(), m);
                             } else if (getPieceColor(board[to]) == sideToPlay) {
                                 break;
                             } else {
                                 Move m(from, to, MT_CAPTURE, board[from],
                                        board[to]);
-                                moves[m.getCoordinateNotation()] = m;
+                                moves.emplace(m.getCoordinateNotation(), m);
                             }
 
                             if (!doesSlide[pieceType]) break;
@@ -303,7 +303,7 @@ class Board {
                             if (pathEmpty) {
                                 Move m(from, from + 2, MT_CASTLE_KING,
                                        board[from], board[to]);
-                                moves[m.getCoordinateNotation()] = m;
+                                moves.emplace(m.getCoordinateNotation(), m);
                             }
                         }
                         if (state.canQueensideCastle(sideToPlay)) {
@@ -331,7 +331,7 @@ class Board {
                             if (pathEmpty) {
                                 Move m(from, from + 2, MT_CASTLE_QUEEN,
                                        board[from], board[to]);
-                                moves[m.getCoordinateNotation()] = m;
+                                moves.emplace(m.getCoordinateNotation(), m);
                             }
                         }
                     }
@@ -344,6 +344,12 @@ class Board {
 
   public:
     Board() : sideToPlay(PC_WHITE) { gameStateStack.emplace(); }
+
+    void flipSides() {
+        sideToPlay = sideToPlay == PC_WHITE ? PC_BLACK : PC_WHITE;
+    }
+
+    PieceColor getSideToPlay() { return sideToPlay; }
 
     // No legality checks for now. Let's assume the move is legal
     void makeMove(Move& move) {

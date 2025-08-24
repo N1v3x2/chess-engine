@@ -31,6 +31,8 @@ class Move {
     static string getRank(ui square) { return to_string(square / 8 + 1); }
 
   public:
+    Move() : from(0), to(0), flags(0), fromPiece(P_EMPTY), toPiece(P_EMPTY) {}
+
     Move(ui from, ui to, int flags, Piece p1, Piece p2)
         : from(from), to(to), flags(flags), fromPiece(p1), toPiece(p2) {}
 
