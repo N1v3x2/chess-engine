@@ -27,7 +27,7 @@ int main() {
                 Move move = board.parseMove(inputMove, legalMoves);
                 board.makeMove(move);
                 validMove = true;
-            } catch (invalid_argument err) {
+            } catch (const invalid_argument& err) {
                 cout << "Parse error: " << err.what() << "\n";
             }
         }

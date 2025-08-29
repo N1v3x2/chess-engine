@@ -4,7 +4,6 @@
 constexpr unsigned int BOFFSET = 8;
 
 enum PieceType {
-    // PT_INVALID = -1,
     PT_EMPTY = 0,
     PT_PAWN = 1,
     PT_KNIGHT = 2,

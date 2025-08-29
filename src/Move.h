@@ -27,7 +27,7 @@ class Move {
     ui from, to, flags;
     Piece fromPiece, toPiece;
 
-    static string getFile(ui square) { return to_string(square % 8); }
+    static string getFile(ui square) { return string(1, 'a' + square % 8); }
     static string getRank(ui square) { return to_string(square / 8 + 1); }
 
   public:
@@ -42,15 +42,31 @@ class Move {
     ui getFromSquare() { return from; }
     ui getToSquare() { return to; }
 
-    bool isDoublePawnPush() { return flags & MT_DOUBLE_PAWN_PUSH; }
-    bool isKingSideCastle() { return flags & MT_CASTLE_KING; }
-    bool isQueenSideCastle() { return flags & MT_CASTLE_QUEEN; }
-    bool isCapture() { return flags & MT_CAPTURE; }
-    bool isEnpassantCapture() { return flags & MT_CAPTURE_EP; }
-    bool isKnightPromotion() { return flags & MT_PROMOTION_KNIGHT; }
-    bool isBishopPromotion() { return flags & MT_PROMOTION_BISHOP; }
-    bool isRookPromotion() { return flags & MT_PROMOTION_ROOK; }
-    bool isQueenPromotion() { return flags & MT_PROMOTION_QUEEN; }
+    bool isDoublePawnPush() {
+        return (flags & MT_DOUBLE_PAWN_PUSH) == MT_DOUBLE_PAWN_PUSH;
+    }
+    bool isKingSideCastle() {
+        return (flags & MT_CASTLE_KING) == MT_CASTLE_KING;
+    }
+    bool isQueenSideCastle() {
+        return (flags & MT_CASTLE_QUEEN) == MT_CASTLE_QUEEN;
+    }
+    bool isCapture() { return (flags & MT_CAPTURE) == MT_CAPTURE; }
+    bool isEnpassantCapture() {
+        return (flags & MT_CAPTURE_EP) == MT_CAPTURE_EP;
+    }
+    bool isKnightPromotion() {
+        return (flags & MT_PROMOTION_KNIGHT) == MT_PROMOTION_KNIGHT;
+    }
+    bool isBishopPromotion() {
+        return (flags & MT_PROMOTION_BISHOP) == MT_PROMOTION_BISHOP;
+    }
+    bool isRookPromotion() {
+        return (flags & MT_PROMOTION_ROOK) == MT_PROMOTION_ROOK;
+    }
+    bool isQueenPromotion() {
+        return (flags & MT_PROMOTION_QUEEN) == MT_PROMOTION_QUEEN;
+    }
 
     string getCoordinateNotation() {
         string fromSquare = getFile(from) + getRank(from);

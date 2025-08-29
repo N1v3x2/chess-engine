@@ -30,7 +30,7 @@ constexpr int mailbox[120] = {
     41, 42, 43, 44, 45, 46, 47, -1, -1, 48, 49, 50, 51, 52, 53, 54, 55, -1,
     -1, 56, 57, 58, 59, 60, 61, 62, 63, -1, -1, -1, -1, -1, -1, -1, -1, -1,
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
-constexpr ui mailbox64[64] = {
+constexpr int mailbox64[64] = {
     21, 22, 23, 24, 25, 26, 27, 28, 31, 32, 33, 34, 35, 36, 37, 38,
     41, 42, 43, 44, 45, 46, 47, 48, 51, 52, 53, 54, 55, 56, 57, 58,
     61, 62, 63, 64, 65, 66, 67, 68, 71, 72, 73, 74, 75, 76, 77, 78,
@@ -159,7 +159,7 @@ class Board {
         // Pawn offsets
         int pushOffset = sideToPlay == PC_WHITE ? 10 : -10;
         int leftCaptureOffset = sideToPlay == PC_WHITE ? 9 : -11;
-        int rightCaptureOffset = sideToPlay == PC_BLACK ? 11 : -9;
+        int rightCaptureOffset = sideToPlay == PC_WHITE ? 11 : -9;
 
         for (ui from = 0; from < 64; ++from) {
             PieceType pieceType = getPieceType(board[from]);
@@ -256,10 +256,10 @@ class Board {
                         }
                     }
                 } else {
-                    for (ui j = 0; j < numOffsets[pieceType]; ++j) {
+                    for (ui j = 0; j < numOffsets[pieceType - 1]; ++j) {
                         for (ui k = 1;; ++k) {
                             to = mailbox[mailbox64[from] +
-                                         k * offsets[pieceType][j]];
+                                         k * offsets[pieceType - 1][j]];
                             if (to == -1) break; // Move would go off the board
 
                             if (getPieceType(board[to]) == PT_EMPTY) {
@@ -274,7 +274,7 @@ class Board {
                                 moves.emplace(m.getCoordinateNotation(), m);
                             }
 
-                            if (!doesSlide[pieceType]) break;
+                            if (!doesSlide[pieceType - 1]) break;
                         }
                     }
                     // NOTE: cannot castle out of check
@@ -485,8 +485,14 @@ class Board {
         if (move.size() < 4 || move.size() > 5)
             throw invalid_argument("Invalid input length.");
 
-        ui from = convertStringToSquare(move.substr(0, 2));
-        ui to = convertStringToSquare(move.substr(2, 2));
+        if (move[0] < 'a' || move[0] > 'h' || move[1] < '1' || move[1] > '8')
+            throw invalid_argument("Invalid from square.");
+
+        if (move[2] < 'a' || move[2] > 'h' || move[3] < '1' || move[3] > '8')
+            throw invalid_argument("Invalid to square.");
+
+        int from = convertStringToSquare(move.substr(0, 2));
+        int to = convertStringToSquare(move.substr(2, 2));
 
         if (from < 0 || from > 63)
             throw invalid_argument("From square out of bounds.");

@@ -1,10 +1,10 @@
+#ifndef GRAPHICS_H
+#define GRAPHICS_H
+
 #include "Piece.h"
 
 #include <string>
 #include <unordered_map>
-
-using std::string;
-using std::unordered_map;
 
 namespace term {
 constexpr const char* CLEAR = "\x1b[2J";
@@ -21,6 +21,8 @@ constexpr const char* DARK_SQUARE = "\033[48;2;190;120;75m";
 constexpr const char* DARK_TEXT = "\x1b[38;5;0m";
 } // namespace term
 
-const unordered_map<PieceType, string> glyph = {
+const std::unordered_map<PieceType, std::string> glyph = {
     {PT_KING, "♚"},   {PT_QUEEN, "♛"}, {PT_ROOK, "♜"}, {PT_BISHOP, "♝"},
     {PT_KNIGHT, "♞"}, {PT_PAWN, "♟"},  {PT_EMPTY, " "}};
+
+#endif // !GRAPHICS_H
