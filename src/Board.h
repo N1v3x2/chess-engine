@@ -107,7 +107,11 @@ class Board {
                 for (ui k = 1;; ++k) {
                     from =
                         mailbox[mailbox64[square] + k * offsets[pieceType][j]];
-                    if (from == -1) break; // Move would go off the board
+                    // Reached friendly piece or edge of board
+                    if (from == -1 ||
+                        (board[from] != P_EMPTY &&
+                         getPieceColor(board[from]) == sideToPlay))
+                        break;
 
                     if (getPieceType(board[from]) ==
                             (PieceType)(pieceType + 1) &&
@@ -120,14 +124,16 @@ class Board {
         }
         // Check pawn attacks
         int leftCaptureOffset = sideToPlay == PC_WHITE ? 9 : -11;
-        int rightCaptureOffset = sideToPlay == PC_BLACK ? 11 : -9;
+        int rightCaptureOffset = sideToPlay == PC_WHITE ? 11 : -9;
 
         for (auto captureOffset : {leftCaptureOffset, rightCaptureOffset}) {
             from = mailbox[mailbox64[square] + captureOffset];
-            if (from != -1 && getPieceType(board[from]) == PT_PAWN) return true;
+            if (from != -1 && getPieceType(board[from]) == PT_PAWN &&
+                getPieceColor(board[from]) != sideToPlay)
+                return true;
         }
 
-        // En passant
+        // Check En Passant attacks
         if (gameStateStack.top().epSquare == (int)square) {
             for (auto captureOffset : {-1, 1}) {
                 from = mailbox[mailbox64[square] + captureOffset];
@@ -277,8 +283,8 @@ class Board {
                             if (!doesSlide[pieceType - 1]) break;
                         }
                     }
-                    // NOTE: cannot castle out of check
                     if (pieceType == PT_KING && !isAttacked(from)) {
+                        // NOTE: cannot castle out of check
                         // NOTE: cannot castle through attacked square; however,
                         // squares outside the king's castle path can be
                         // attacked
@@ -329,7 +335,7 @@ class Board {
                                 pathEmpty = false;
 
                             if (pathEmpty) {
-                                Move m(from, from + 2, MT_CASTLE_QUEEN,
+                                Move m(from, from - 2, MT_CASTLE_QUEEN,
                                        board[from], board[to]);
                                 moves.emplace(m.getCoordinateNotation(), m);
                             }
@@ -345,9 +351,7 @@ class Board {
   public:
     Board() : sideToPlay(PC_WHITE) { gameStateStack.emplace(); }
 
-    void flipSides() {
-        sideToPlay = sideToPlay == PC_WHITE ? PC_BLACK : PC_WHITE;
-    }
+    void flipSides() { sideToPlay = (PieceColor)!sideToPlay; }
 
     PieceColor getSideToPlay() { return sideToPlay; }
 
@@ -419,7 +423,6 @@ class Board {
         board[move.getFromSquare()] = P_EMPTY;
         gameStateStack.push(newState);
         gameList.push_back(move);
-        sideToPlay = (PieceColor)!sideToPlay;
     }
 
     void unmakeMove() {
@@ -455,7 +458,7 @@ class Board {
 
         for (auto& [notation, move] : pseudo) {
             makeMove(move);
-            if (!isInCheck()) legal[notation] = move;
+            if (!isInCheck()) legal.emplace(notation, move);
             unmakeMove();
         }
 

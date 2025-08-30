@@ -9,17 +9,19 @@ using std::invalid_argument;
 
 int main() {
     Board board;
+    bool validMove;
+    string inputMove;
+    unordered_map<string, Move> legalMoves;
 
     // TODO: check for game end conditions
     while (true) {
         board.printBoard();
 
-        bool validMove = false;
-        string inputMove;
-        unordered_map<string, Move> legalMoves = board.generateMoves();
+        validMove = false;
+        legalMoves = board.generateMoves();
 
         while (!validMove) {
-            cout << "Make your move ("
+            cout << "[game] Make your move ("
                  << (board.getSideToPlay() == PC_WHITE ? "white" : "black")
                  << "): ";
             cin >> inputMove;
@@ -28,7 +30,7 @@ int main() {
                 board.makeMove(move);
                 validMove = true;
             } catch (const invalid_argument& err) {
-                cout << "Parse error: " << err.what() << "\n";
+                cout << "[game] " << err.what() << "\n";
             }
         }
 

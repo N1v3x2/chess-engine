@@ -42,44 +42,36 @@ class Move {
     ui getFromSquare() { return from; }
     ui getToSquare() { return to; }
 
-    bool isDoublePawnPush() {
-        return (flags & MT_DOUBLE_PAWN_PUSH) == MT_DOUBLE_PAWN_PUSH;
-    }
-    bool isKingSideCastle() {
-        return (flags & MT_CASTLE_KING) == MT_CASTLE_KING;
-    }
-    bool isQueenSideCastle() {
-        return (flags & MT_CASTLE_QUEEN) == MT_CASTLE_QUEEN;
-    }
+    bool isDoublePawnPush() { return flags == MT_DOUBLE_PAWN_PUSH; }
+    bool isKingSideCastle() { return flags == MT_CASTLE_KING; }
+    bool isQueenSideCastle() { return flags == MT_CASTLE_QUEEN; }
     bool isCapture() { return (flags & MT_CAPTURE) == MT_CAPTURE; }
-    bool isEnpassantCapture() {
-        return (flags & MT_CAPTURE_EP) == MT_CAPTURE_EP;
-    }
+    bool isEnpassantCapture() { return flags == MT_CAPTURE_EP; }
     bool isKnightPromotion() {
-        return (flags & MT_PROMOTION_KNIGHT) == MT_PROMOTION_KNIGHT;
+        return (flags & ~MT_CAPTURE) == MT_PROMOTION_KNIGHT;
     }
     bool isBishopPromotion() {
-        return (flags & MT_PROMOTION_BISHOP) == MT_PROMOTION_BISHOP;
+        return (flags & ~MT_CAPTURE) == MT_PROMOTION_BISHOP;
     }
     bool isRookPromotion() {
-        return (flags & MT_PROMOTION_ROOK) == MT_PROMOTION_ROOK;
+        return (flags & ~MT_CAPTURE) == MT_PROMOTION_ROOK;
     }
     bool isQueenPromotion() {
-        return (flags & MT_PROMOTION_QUEEN) == MT_PROMOTION_QUEEN;
+        return (flags & ~MT_CAPTURE) == MT_PROMOTION_QUEEN;
     }
 
     string getCoordinateNotation() {
         string fromSquare = getFile(from) + getRank(from);
         string toSquare = getFile(to) + getRank(to);
         string promotionPiece;
-        if (isKnightPromotion())
-            promotionPiece = "n";
-        else if (isBishopPromotion())
-            promotionPiece = "b";
+        if (isQueenPromotion())
+            promotionPiece = "q";
         else if (isRookPromotion())
             promotionPiece = "r";
-        else if (isQueenPromotion())
-            promotionPiece = "q";
+        else if (isBishopPromotion())
+            promotionPiece = "b";
+        else if (isKnightPromotion())
+            promotionPiece = "n";
         return fromSquare + toSquare + promotionPiece;
     }
 };
