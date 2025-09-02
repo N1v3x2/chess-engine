@@ -1,11 +1,12 @@
 #ifndef BOARD_H
 #define BOARD_H
 
+#include "GameState.h"
 #include "Graphics.h"
 #include "Move.h"
 #include "MoveParser.h"
 #include "Piece.h"
-
+#include <array>
 #include <cmath>
 #include <iostream>
 #include <stack>
@@ -13,16 +14,18 @@
 #include <unordered_map>
 #include <vector>
 
+using namespace moveparser;
+using namespace pieceutils;
+using std::array;
 using std::cout;
 using std::invalid_argument;
 using std::runtime_error;
 using std::stack;
 using std::unordered_map;
 using std::vector;
-
 using ui = unsigned int;
 
-constexpr int mailbox[120] = {
+constexpr array<int, 120> mailbox{
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
     -1, -1, -1, 0,  1,  2,  3,  4,  5,  6,  7,  -1, -1, 8,  9,  10, 11, 12,
     13, 14, 15, -1, -1, 16, 17, 18, 19, 20, 21, 22, 23, -1, -1, 24, 25, 26,
@@ -30,58 +33,27 @@ constexpr int mailbox[120] = {
     41, 42, 43, 44, 45, 46, 47, -1, -1, 48, 49, 50, 51, 52, 53, 54, 55, -1,
     -1, 56, 57, 58, 59, 60, 61, 62, 63, -1, -1, -1, -1, -1, -1, -1, -1, -1,
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
-constexpr int mailbox64[64] = {
+constexpr array<int, 64> mailbox64{
     21, 22, 23, 24, 25, 26, 27, 28, 31, 32, 33, 34, 35, 36, 37, 38,
     41, 42, 43, 44, 45, 46, 47, 48, 51, 52, 53, 54, 55, 56, 57, 58,
     61, 62, 63, 64, 65, 66, 67, 68, 71, 72, 73, 74, 75, 76, 77, 78,
     81, 82, 83, 84, 85, 86, 87, 88, 91, 92, 93, 94, 95, 96, 97, 98};
 
 // pawn, knight, bishop, rook, queen, king
-constexpr bool doesSlide[6] = {false, false, true, true, true, false};
-constexpr ui numOffsets[6] = {0, 8, 4, 4, 8, 8};
-constexpr int offsets[6][8] = {
-    {0, 0, 0, 0, 0, 0, 0, 0},         {-21, -19, -12, -8, 8, 12, 19, 21},
-    {-11, -9, 9, 11, 0, 0, 0, 0},     {-10, -1, 1, 10, 0, 0, 0, 0},
-    {-11, -10, -9, -1, 1, 9, 10, 11}, {-11, -10, -9, -1, 1, 9, 10, 11}};
+constexpr array<bool, 6> doesSlide{false, false, true, true, true, false};
+constexpr array<ui, 6> numOffsets{0, 8, 4, 4, 8, 8};
+constexpr array<array<int, 8>, 6> offsets{{{0, 0, 0, 0, 0, 0, 0, 0},
+                                           {-21, -19, -12, -8, 8, 12, 19, 21},
+                                           {-11, -9, 9, 11, 0, 0, 0, 0},
+                                           {-10, -1, 1, 10, 0, 0, 0, 0},
+                                           {-11, -10, -9, -1, 1, 9, 10, 11},
+                                           {-11, -10, -9, -1, 1, 9, 10, 11}}};
 
 class Board {
   private:
-    struct GameState {
-      private:
-        bool canWhiteQueensideCastle = true;
-        bool canWhiteKingsideCastle = true;
-        bool canBlackQueensideCastle = true;
-        bool canBlackKingsideCastle = true;
-
-      public:
-        Piece epCapturedPiece = P_EMPTY;
-        int epSquare = -1;
-        int halfmoveClock = 0; // Capture, pawn move, castle
-        bool canKingsideCastle(PieceColor side) {
-            return side == PC_WHITE ? canWhiteKingsideCastle
-                                    : canBlackKingsideCastle;
-        }
-        bool canQueensideCastle(PieceColor side) {
-            return side == PC_WHITE ? canWhiteQueensideCastle
-                                    : canBlackQueensideCastle;
-        }
-        void removeKingsideCastlingRights(PieceColor side) {
-            if (side == PC_WHITE)
-                canWhiteKingsideCastle = false;
-            else
-                canBlackKingsideCastle = false;
-        }
-        void removeQueensideCastlingRights(PieceColor side) {
-            if (side == PC_WHITE)
-                canWhiteQueensideCastle = false;
-            else
-                canBlackQueensideCastle = false;
-        }
-    };
-
     PieceColor sideToPlay; // 0 = white, 1 = black
     // No piece list for now
-    Piece board[64]{
+    array<Piece, 64> board{
         P_WROOK, P_WKNIGHT, P_WBISHOP, P_WQUEEN, P_WKING, P_WBISHOP, P_WKNIGHT,
         P_WROOK, P_WPAWN,   P_WPAWN,   P_WPAWN,  P_WPAWN, P_WPAWN,   P_WPAWN,
         P_WPAWN, P_WPAWN,   P_EMPTY,   P_EMPTY,  P_EMPTY, P_EMPTY,   P_EMPTY,
@@ -353,10 +325,10 @@ class Board {
 
     void flipSides() { sideToPlay = (PieceColor)!sideToPlay; }
 
-    PieceColor getSideToPlay() { return sideToPlay; }
+    PieceColor getSideToPlay() const { return sideToPlay; }
 
     // No legality checks for now. Let's assume the move is legal
-    void makeMove(Move& move) {
+    void makeMove(const Move& move) {
         Piece piece;
         GameState newState = gameStateStack.top();
         newState.epSquare = -1;
@@ -466,7 +438,7 @@ class Board {
     }
 
     void printBoard() {
-        cout << term::CLEAR << term::HOME << '\n';
+        cout << graphics::CLEAR << graphics::HOME << '\n';
         int k;
         bool darkBg, darkPiece;
         for (int i = 7; i >= 0; --i) {
@@ -475,16 +447,20 @@ class Board {
                 k = 8 * i + j;
                 darkBg = (k + i) % 2;
                 darkPiece = getPieceColor(board[k]) == PC_BLACK;
-                cout << (darkBg ? term::DARK_SQUARE : term::LIGHT_SQUARE) << " "
-                     << (darkPiece ? term::DARK_TEXT : term::LIGHT_TEXT)
-                     << glyph.at(getPieceType(board[k])) << " " << term::RESET;
+                cout << (darkBg ? graphics::DARK_SQUARE
+                                : graphics::LIGHT_SQUARE)
+                     << " "
+                     << (darkPiece ? graphics::DARK_TEXT : graphics::LIGHT_TEXT)
+                     << graphics::glyph.at(getPieceType(board[k])) << " "
+                     << graphics::RESET;
             }
             cout << '\n';
         }
         cout << "    a  b  c  d  e  f  g  h\n";
     }
 
-    Move parseMove(string move, unordered_map<string, Move>& legalMoves) {
+    Move parseMove(const string& move,
+                   const unordered_map<string, Move>& legalMoves) const {
         if (move.size() < 4 || move.size() > 5)
             throw invalid_argument("Invalid input length.");
 
@@ -516,7 +492,7 @@ class Board {
         if (!legalMoves.count(move))
             throw invalid_argument("Must make legal move.");
 
-        return legalMoves[move];
+        return legalMoves.at(move);
     }
 };
 

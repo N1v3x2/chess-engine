@@ -1,7 +1,9 @@
 #ifndef PIECE_H
 #define PIECE_H
 
+namespace {
 constexpr unsigned int BOFFSET = 8;
+}
 
 enum PieceType {
     PT_EMPTY = 0,
@@ -37,9 +39,13 @@ enum Piece {
     P_BKING = BOFFSET | PT_KING,
 };
 
+namespace pieceutils {
+
 constexpr PieceColor getPieceColor(Piece p) {
     return (p & BOFFSET) ? PC_BLACK : PC_WHITE;
 }
 constexpr PieceType getPieceType(Piece p) { return (PieceType)(p & ~BOFFSET); }
+
+} // namespace pieceutils
 
 #endif // !PIECE_H

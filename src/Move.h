@@ -4,9 +4,9 @@
 #include "Piece.h"
 #include <string>
 
+using pieceutils::getPieceType;
 using std::string;
 using std::to_string;
-
 using ui = unsigned int;
 
 enum MoveType {
@@ -36,31 +36,31 @@ class Move {
     Move(ui from, ui to, int flags, Piece p1, Piece p2)
         : from(from), to(to), flags(flags), fromPiece(p1), toPiece(p2) {}
 
-    Piece getFromPiece() { return fromPiece; }
-    PieceType getFromPieceType() { return getPieceType(fromPiece); }
-    Piece getToPiece() { return toPiece; }
-    ui getFromSquare() { return from; }
-    ui getToSquare() { return to; }
+    Piece getFromPiece() const { return fromPiece; }
+    PieceType getFromPieceType() const { return getPieceType(fromPiece); }
+    Piece getToPiece() const { return toPiece; }
+    ui getFromSquare() const { return from; }
+    ui getToSquare() const { return to; }
 
-    bool isDoublePawnPush() { return flags == MT_DOUBLE_PAWN_PUSH; }
-    bool isKingSideCastle() { return flags == MT_CASTLE_KING; }
-    bool isQueenSideCastle() { return flags == MT_CASTLE_QUEEN; }
-    bool isCapture() { return (flags & MT_CAPTURE) == MT_CAPTURE; }
-    bool isEnpassantCapture() { return flags == MT_CAPTURE_EP; }
-    bool isKnightPromotion() {
+    bool isDoublePawnPush() const { return flags == MT_DOUBLE_PAWN_PUSH; }
+    bool isKingSideCastle() const { return flags == MT_CASTLE_KING; }
+    bool isQueenSideCastle() const { return flags == MT_CASTLE_QUEEN; }
+    bool isCapture() const { return (flags & MT_CAPTURE) == MT_CAPTURE; }
+    bool isEnpassantCapture() const { return flags == MT_CAPTURE_EP; }
+    bool isKnightPromotion() const {
         return (flags & ~MT_CAPTURE) == MT_PROMOTION_KNIGHT;
     }
-    bool isBishopPromotion() {
+    bool isBishopPromotion() const {
         return (flags & ~MT_CAPTURE) == MT_PROMOTION_BISHOP;
     }
-    bool isRookPromotion() {
+    bool isRookPromotion() const {
         return (flags & ~MT_CAPTURE) == MT_PROMOTION_ROOK;
     }
-    bool isQueenPromotion() {
+    bool isQueenPromotion() const {
         return (flags & ~MT_CAPTURE) == MT_PROMOTION_QUEEN;
     }
 
-    string getCoordinateNotation() {
+    string getCoordinateNotation() const {
         string fromSquare = getFile(from) + getRank(from);
         string toSquare = getFile(to) + getRank(to);
         string promotionPiece;

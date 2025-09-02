@@ -1,6 +1,5 @@
 #include "Board.h"
 #include "Move.h"
-
 #include <iostream>
 #include <stdexcept>
 
