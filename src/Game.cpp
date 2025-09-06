@@ -1,5 +1,6 @@
 #include "Board.h"
 #include "Move.h"
+#include "Zobrist.h"
 #include <iostream>
 #include <stdexcept>
 
@@ -7,6 +8,8 @@ using std::cout, std::cin;
 using std::invalid_argument;
 
 int main() {
+    zobrist::init();
+
     Board board;
     bool validMove;
     string inputMove;

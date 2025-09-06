@@ -6,6 +6,7 @@
 #include "Move.h"
 #include "MoveParser.h"
 #include "Piece.h"
+#include "Zobrist.h"
 #include <array>
 #include <cmath>
 #include <iostream>
@@ -23,7 +24,9 @@ using std::runtime_error;
 using std::stack;
 using std::unordered_map;
 using std::vector;
+using zobrist::getPieceIdx;
 using ui = unsigned int;
+using hash_t = unsigned long long;
 
 constexpr array<int, 120> mailbox{
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
@@ -51,7 +54,7 @@ constexpr array<array<int, 8>, 6> offsets{{{0, 0, 0, 0, 0, 0, 0, 0},
 
 class Board {
   private:
-    PieceColor sideToPlay; // 0 = white, 1 = black
+    PieceColor sideToMove; // 0 = white, 1 = black
     // No piece list for now
     array<Piece, 64> board{
         P_WROOK, P_WKNIGHT, P_WBISHOP, P_WQUEEN, P_WKING, P_WBISHOP, P_WKNIGHT,
@@ -67,6 +70,7 @@ class Board {
     };
     vector<Move> gameList;
     stack<GameState> gameStateStack;
+    hash_t positionHash;
 
     // TODO: add map of zobrist keys to handle three-fold repetition
     // TODO: handle game end conditions (draw, lose)
@@ -82,12 +86,12 @@ class Board {
                     // Reached friendly piece or edge of board
                     if (from == -1 ||
                         (board[from] != P_EMPTY &&
-                         getPieceColor(board[from]) == sideToPlay))
+                         getPieceColor(board[from]) == sideToMove))
                         break;
 
                     if (getPieceType(board[from]) ==
                             (PieceType)(pieceType + 1) &&
-                        getPieceColor(board[from]) != sideToPlay)
+                        getPieceColor(board[from]) != sideToMove)
                         return true;
 
                     if (!doesSlide[pieceType]) break;
@@ -95,13 +99,13 @@ class Board {
             }
         }
         // Check pawn attacks
-        int leftCaptureOffset = sideToPlay == PC_WHITE ? 9 : -11;
-        int rightCaptureOffset = sideToPlay == PC_WHITE ? 11 : -9;
+        int leftCaptureOffset = sideToMove == PC_WHITE ? 9 : -11;
+        int rightCaptureOffset = sideToMove == PC_WHITE ? 11 : -9;
 
         for (auto captureOffset : {leftCaptureOffset, rightCaptureOffset}) {
             from = mailbox[mailbox64[square] + captureOffset];
             if (from != -1 && getPieceType(board[from]) == PT_PAWN &&
-                getPieceColor(board[from]) != sideToPlay)
+                getPieceColor(board[from]) != sideToMove)
                 return true;
         }
 
@@ -110,7 +114,7 @@ class Board {
             for (auto captureOffset : {-1, 1}) {
                 from = mailbox[mailbox64[square] + captureOffset];
                 if (from != -1 && getPieceType(board[from]) == PT_PAWN &&
-                    getPieceColor(board[from]) != sideToPlay)
+                    getPieceColor(board[from]) != sideToMove)
                     return true;
             }
         }
@@ -121,8 +125,8 @@ class Board {
     bool isInCheck() {
         int kingSquare = -1;
         for (ui i = 0; i < 64; ++i) {
-            if ((sideToPlay == PC_WHITE && board[i] == P_WKING) ||
-                (sideToPlay == PC_BLACK && board[i] == P_BKING)) {
+            if ((sideToMove == PC_WHITE && board[i] == P_WKING) ||
+                (sideToMove == PC_BLACK && board[i] == P_BKING)) {
                 kingSquare = i;
                 break;
             }
@@ -135,22 +139,22 @@ class Board {
         unordered_map<string, Move> moves;
 
         // Pawn offsets
-        int pushOffset = sideToPlay == PC_WHITE ? 10 : -10;
-        int leftCaptureOffset = sideToPlay == PC_WHITE ? 9 : -11;
-        int rightCaptureOffset = sideToPlay == PC_WHITE ? 11 : -9;
+        int pushOffset = sideToMove == PC_WHITE ? 10 : -10;
+        int leftCaptureOffset = sideToMove == PC_WHITE ? 9 : -11;
+        int rightCaptureOffset = sideToMove == PC_WHITE ? 11 : -9;
 
         for (ui from = 0; from < 64; ++from) {
             PieceType pieceType = getPieceType(board[from]);
             if (pieceType == PT_EMPTY) continue;
-            if (getPieceColor(board[from]) == sideToPlay) {
+            if (getPieceColor(board[from]) == sideToMove) {
                 int to;
                 if (pieceType == PT_PAWN) {
                     // Push
                     to = mailbox[mailbox64[from] + pushOffset];
                     if (to != -1 && getPieceType(board[to]) == PT_EMPTY) {
                         // Promotion
-                        if ((sideToPlay == PC_BLACK && to < 8) ||
-                            (sideToPlay == PC_WHITE && to >= 56)) {
+                        if ((sideToMove == PC_BLACK && to < 8) ||
+                            (sideToMove == PC_WHITE && to >= 56)) {
                             Move m(from, to, MT_PROMOTION_KNIGHT, board[from],
                                    board[to]);
                             moves.emplace(m.getCoordinateNotation(), m);
@@ -172,9 +176,9 @@ class Board {
                         }
 
                         // Double push
-                        if ((sideToPlay == PC_BLACK && from >= 48 &&
+                        if ((sideToMove == PC_BLACK && from >= 48 &&
                              from < 56) ||
-                            (sideToPlay == PC_WHITE && from >= 8 &&
+                            (sideToMove == PC_WHITE && from >= 8 &&
                              from < 16)) {
                             to = mailbox[mailbox64[from] + 2 * pushOffset];
                             if (getPieceType(board[to]) == PT_EMPTY) {
@@ -191,10 +195,10 @@ class Board {
 
                         to = mailbox[mailbox64[from] + captureOffset];
                         if (to != -1 && getPieceType(board[to]) != PT_EMPTY &&
-                            getPieceColor(board[to]) != sideToPlay) {
+                            getPieceColor(board[to]) != sideToMove) {
                             // Promotion
-                            if ((sideToPlay == PC_BLACK && to < 8) ||
-                                (sideToPlay == PC_WHITE && to >= 56)) {
+                            if ((sideToMove == PC_BLACK && to < 8) ||
+                                (sideToMove == PC_WHITE && to >= 56)) {
                                 Move m(from, to,
                                        MT_PROMOTION_KNIGHT | MT_CAPTURE,
                                        board[from], board[to]);
@@ -227,7 +231,7 @@ class Board {
                         int epSquare = gameStateStack.top().epSquare;
                         if (abs(gameStateStack.top().epSquare - (int)from) ==
                             1) {
-                            to = epSquare + (sideToPlay == PC_WHITE ? 8 : -8);
+                            to = epSquare + (sideToMove == PC_WHITE ? 8 : -8);
                             Move m(from, to, MT_CAPTURE_EP, board[from],
                                    board[epSquare]);
                             moves.emplace(m.getCoordinateNotation(), m);
@@ -244,7 +248,7 @@ class Board {
                                 Move m(from, to, MT_QUIET, board[from],
                                        board[to]);
                                 moves.emplace(m.getCoordinateNotation(), m);
-                            } else if (getPieceColor(board[to]) == sideToPlay) {
+                            } else if (getPieceColor(board[to]) == sideToMove) {
                                 break;
                             } else {
                                 Move m(from, to, MT_CAPTURE, board[from],
@@ -264,8 +268,8 @@ class Board {
                         vector<ui> kingSquares;
                         bool pathEmpty;
 
-                        if (state.canKingsideCastle(sideToPlay)) {
-                            if (sideToPlay == PC_WHITE)
+                        if (state.canKingsideCastle(sideToMove)) {
+                            if (sideToMove == PC_WHITE)
                                 kingSquares = {5, 6};
                             else
                                 kingSquares = {61, 62};
@@ -284,8 +288,8 @@ class Board {
                                 moves.emplace(m.getCoordinateNotation(), m);
                             }
                         }
-                        if (state.canQueensideCastle(sideToPlay)) {
-                            if (sideToPlay == PC_WHITE)
+                        if (state.canQueensideCastle(sideToMove)) {
+                            if (sideToMove == PC_WHITE)
                                 kingSquares = {2, 3};
                             else
                                 kingSquares = {58, 59};
@@ -298,11 +302,11 @@ class Board {
                                     break;
                                 }
                             }
-                            if (sideToPlay == PC_WHITE &&
+                            if (sideToMove == PC_WHITE &&
                                 getPieceType(board[1]) != PT_EMPTY)
                                 pathEmpty = false;
 
-                            if (sideToPlay == PC_BLACK &&
+                            if (sideToMove == PC_BLACK &&
                                 getPieceType(board[57]) != PT_EMPTY)
                                 pathEmpty = false;
 
@@ -321,17 +325,35 @@ class Board {
     }
 
   public:
-    Board() : sideToPlay(PC_WHITE) { gameStateStack.emplace(); }
+    Board() : sideToMove(PC_WHITE) {
+        gameStateStack.emplace();
+        // Initialize Zobrist hash
+        positionHash = zobrist::sideToMove[sideToMove];
+        for (ui i = 0; i < 4; ++i) {
+            positionHash ^= zobrist::castleRights[i];
+        }
+        // Don't include empty squares in hash
+        for (ui i = 0; i < 16; ++i) {
+            positionHash ^= zobrist::pieceSquare[i][getPieceIdx(board[i])];
+        }
+        for (ui i = 48; i < 64; ++i) {
+            positionHash ^= zobrist::pieceSquare[i][getPieceIdx(board[i])];
+        }
+    }
 
-    void flipSides() { sideToPlay = (PieceColor)!sideToPlay; }
+    void flipSides() { sideToMove = (PieceColor)!sideToMove; }
 
-    PieceColor getSideToPlay() const { return sideToPlay; }
+    PieceColor getSideToPlay() const { return sideToMove; }
 
     // No legality checks for now. Let's assume the move is legal
     void makeMove(const Move& move) {
         Piece piece;
         GameState newState = gameStateStack.top();
-        newState.epSquare = -1;
+
+        if (newState.epSquare != -1) {
+            positionHash ^= zobrist::epSquare[newState.epSquare];
+            newState.epSquare = -1;
+        }
 
         if (move.getFromPieceType() == PT_PAWN) {
             newState.halfmoveClock = 0;
@@ -339,60 +361,106 @@ class Board {
 
             if (move.isDoublePawnPush()) {
                 newState.epSquare = move.getToSquare();
+                positionHash ^= zobrist::epSquare[newState.epSquare];
             }
 
             if (move.isEnpassantCapture()) {
-                int offset = sideToPlay == PC_WHITE ? -8 : 8;
+                int offset = sideToMove == PC_WHITE ? -8 : 8;
                 ui epSquare = move.getToSquare() + offset;
                 newState.epCapturedPiece = board[epSquare];
                 board[epSquare] = P_EMPTY;
+                positionHash ^=
+                    zobrist::pieceSquare[epSquare]
+                                        [getPieceIdx(board[epSquare])];
             }
 
             if (move.isKnightPromotion())
-                piece = sideToPlay == PC_WHITE ? P_WKNIGHT : P_BKNIGHT;
+                piece = sideToMove == PC_WHITE ? P_WKNIGHT : P_BKNIGHT;
             else if (move.isBishopPromotion())
-                piece = sideToPlay == PC_WHITE ? P_WBISHOP : P_BBISHOP;
+                piece = sideToMove == PC_WHITE ? P_WBISHOP : P_BBISHOP;
             else if (move.isRookPromotion())
-                piece = sideToPlay == PC_WHITE ? P_WROOK : P_BROOK;
+                piece = sideToMove == PC_WHITE ? P_WROOK : P_BROOK;
             else if (move.isQueenPromotion())
-                piece = sideToPlay == PC_WHITE ? P_WQUEEN : P_BQUEEN;
+                piece = sideToMove == PC_WHITE ? P_WQUEEN : P_BQUEEN;
         } else {
             newState.halfmoveClock += 1;
             piece = move.getFromPiece();
 
             if (move.getFromPieceType() == PT_KING) {
-                newState.removeKingsideCastlingRights(sideToPlay);
-                newState.removeQueensideCastlingRights(sideToPlay);
+                if (newState.canKingsideCastle(sideToMove)) {
+                    positionHash ^=
+                        zobrist::castleRights[sideToMove == PC_WHITE ? 0 : 2];
+                    newState.removeKingsideCastlingRights(sideToMove);
+                }
+                if (newState.canQueensideCastle(sideToMove)) {
+                    positionHash ^=
+                        zobrist::castleRights[sideToMove == PC_WHITE ? 1 : 3];
+                    newState.removeQueensideCastlingRights(sideToMove);
+                }
 
                 if (move.isKingSideCastle()) {
                     newState.halfmoveClock = 0;
+
+                    positionHash ^= zobrist::pieceSquare[move.getToSquare() -
+                                                         1][getPieceIdx(
+                        sideToMove == PC_WHITE ? P_WROOK : P_BROOK)];
+                    positionHash ^= zobrist::pieceSquare[move.getToSquare() +
+                                                         1][getPieceIdx(
+                        board[move.getToSquare() + 1])];
+
                     board[move.getToSquare() - 1] =
-                        sideToPlay == PC_WHITE ? P_WROOK : P_BROOK;
+                        sideToMove == PC_WHITE ? P_WROOK : P_BROOK;
                     board[move.getToSquare() + 1] = P_EMPTY;
                 }
 
                 if (move.isQueenSideCastle()) {
                     newState.halfmoveClock = 0;
+
+                    positionHash ^= zobrist::pieceSquare[move.getToSquare() +
+                                                         1][getPieceIdx(
+                        sideToMove == PC_WHITE ? P_WROOK : P_BROOK)];
+                    positionHash ^= zobrist::pieceSquare[move.getToSquare() -
+                                                         2][getPieceIdx(
+                        board[move.getToSquare() - 2])];
+
                     board[move.getToSquare() + 1] =
-                        sideToPlay == PC_WHITE ? P_WROOK : P_BROOK;
+                        sideToMove == PC_WHITE ? P_WROOK : P_BROOK;
                     board[move.getToSquare() - 2] = P_EMPTY;
                 }
             }
 
-            if (move.getFromPieceType() == PT_ROOK) {
-                if (move.getFromSquare() == 7)
-                    newState.removeKingsideCastlingRights(PC_WHITE);
-                if (move.getFromSquare() == 0)
-                    newState.removeQueensideCastlingRights(PC_WHITE);
-                if (move.getFromSquare() == 63)
-                    newState.removeKingsideCastlingRights(PC_BLACK);
-                if (move.getFromSquare() == 56)
-                    newState.removeQueensideCastlingRights(PC_BLACK);
+            if (newState.canKingsideCastle(PC_WHITE) &&
+                (move.getFromSquare() == 7 || move.getToSquare() == 7)) {
+                positionHash ^= zobrist::castleRights[0];
+                newState.removeKingsideCastlingRights(PC_WHITE);
+            }
+
+            if (newState.canQueensideCastle(PC_WHITE) &&
+                (move.getFromSquare() == 0 || move.getToSquare() == 0)) {
+                positionHash ^= zobrist::castleRights[1];
+                newState.removeQueensideCastlingRights(PC_WHITE);
+            }
+
+            if (newState.canKingsideCastle(PC_BLACK) &&
+                (move.getFromSquare() == 63 || move.getToSquare() == 63)) {
+                positionHash ^= zobrist::castleRights[2];
+                newState.removeKingsideCastlingRights(PC_BLACK);
+            }
+
+            if (newState.canQueensideCastle(PC_BLACK) &&
+                (move.getFromSquare() == 56 || move.getToSquare() == 56)) {
+                positionHash ^= zobrist::castleRights[3];
+                newState.removeQueensideCastlingRights(PC_BLACK);
             }
         }
 
+        positionHash ^=
+            zobrist::pieceSquare[move.getFromSquare()][getPieceIdx(piece)] ^
+            zobrist::pieceSquare[move.getToSquare()][getPieceIdx(piece)];
+
         board[move.getToSquare()] = piece;
         board[move.getFromSquare()] = P_EMPTY;
+
         gameStateStack.push(newState);
         gameList.push_back(move);
     }
@@ -404,18 +472,18 @@ class Board {
         gameList.pop_back();
 
         if (move.isEnpassantCapture()) {
-            int offset = sideToPlay == PC_WHITE ? -8 : 8;
+            int offset = sideToMove == PC_WHITE ? -8 : 8;
             board[move.getToSquare() + offset] = state.epCapturedPiece;
         }
         if (move.isKingSideCastle()) {
             board[move.getToSquare() - 1] = P_EMPTY;
             board[move.getToSquare() + 1] =
-                sideToPlay == PC_WHITE ? P_WROOK : P_BROOK;
+                sideToMove == PC_WHITE ? P_WROOK : P_BROOK;
         }
         if (move.isQueenSideCastle()) {
             board[move.getToSquare() + 1] = P_EMPTY;
             board[move.getToSquare() - 2] =
-                sideToPlay == PC_WHITE ? P_WROOK : P_BROOK;
+                sideToMove == PC_WHITE ? P_WROOK : P_BROOK;
         }
 
         board[move.getFromSquare()] = move.getFromPiece();
@@ -482,7 +550,7 @@ class Board {
         if (getPieceType(board[from]) == PT_EMPTY)
             throw invalid_argument("Cannot move empty square.");
 
-        if (getPieceColor(board[from]) != sideToPlay)
+        if (getPieceColor(board[from]) != sideToMove)
             throw invalid_argument("Cannot move opponent's pieces.");
 
         if (getPieceType(board[from]) == PT_PAWN && to >= 56 &&
