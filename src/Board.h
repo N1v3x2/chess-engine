@@ -390,41 +390,34 @@ class Board {
                 if (newState.canKingsideCastle(sideToMove)) {
                     positionHash ^=
                         zobrist::castleRights[sideToMove == PC_WHITE ? 0 : 2];
-                    newState.removeKingsideCastlingRights(sideToMove);
+                    newState.removeKingsideCastleRight(sideToMove);
                 }
                 if (newState.canQueensideCastle(sideToMove)) {
                     positionHash ^=
                         zobrist::castleRights[sideToMove == PC_WHITE ? 1 : 3];
-                    newState.removeQueensideCastlingRights(sideToMove);
+                    newState.removeQueensideCastleRights(sideToMove);
                 }
 
+                Piece rook = sideToMove == PC_WHITE ? P_WROOK : P_BROOK;
                 if (move.isKingSideCastle()) {
                     newState.halfmoveClock = 0;
 
-                    positionHash ^= zobrist::pieceSquare[move.getToSquare() -
-                                                         1][getPieceIdx(
-                        sideToMove == PC_WHITE ? P_WROOK : P_BROOK)];
-                    positionHash ^= zobrist::pieceSquare[move.getToSquare() +
-                                                         1][getPieceIdx(
-                        board[move.getToSquare() + 1])];
-
-                    board[move.getToSquare() - 1] =
-                        sideToMove == PC_WHITE ? P_WROOK : P_BROOK;
+                    positionHash ^= zobrist::pieceSquare[move.getToSquare() - 1]
+                                                        [getPieceIdx(rook)] ^
+                                    zobrist::pieceSquare[move.getToSquare() + 1]
+                                                        [getPieceIdx(rook)];
+                    board[move.getToSquare() - 1] = rook;
                     board[move.getToSquare() + 1] = P_EMPTY;
                 }
 
                 if (move.isQueenSideCastle()) {
                     newState.halfmoveClock = 0;
 
-                    positionHash ^= zobrist::pieceSquare[move.getToSquare() +
-                                                         1][getPieceIdx(
-                        sideToMove == PC_WHITE ? P_WROOK : P_BROOK)];
-                    positionHash ^= zobrist::pieceSquare[move.getToSquare() -
-                                                         2][getPieceIdx(
-                        board[move.getToSquare() - 2])];
-
-                    board[move.getToSquare() + 1] =
-                        sideToMove == PC_WHITE ? P_WROOK : P_BROOK;
+                    positionHash ^= zobrist::pieceSquare[move.getToSquare() + 1]
+                                                        [getPieceIdx(rook)] ^
+                                    zobrist::pieceSquare[move.getToSquare() - 2]
+                                                        [getPieceIdx(rook)];
+                    board[move.getToSquare() + 1] = rook;
                     board[move.getToSquare() - 2] = P_EMPTY;
                 }
             }
@@ -432,31 +425,35 @@ class Board {
             if (newState.canKingsideCastle(PC_WHITE) &&
                 (move.getFromSquare() == 7 || move.getToSquare() == 7)) {
                 positionHash ^= zobrist::castleRights[0];
-                newState.removeKingsideCastlingRights(PC_WHITE);
+                newState.removeKingsideCastleRight(PC_WHITE);
             }
 
             if (newState.canQueensideCastle(PC_WHITE) &&
                 (move.getFromSquare() == 0 || move.getToSquare() == 0)) {
                 positionHash ^= zobrist::castleRights[1];
-                newState.removeQueensideCastlingRights(PC_WHITE);
+                newState.removeQueensideCastleRights(PC_WHITE);
             }
 
             if (newState.canKingsideCastle(PC_BLACK) &&
                 (move.getFromSquare() == 63 || move.getToSquare() == 63)) {
                 positionHash ^= zobrist::castleRights[2];
-                newState.removeKingsideCastlingRights(PC_BLACK);
+                newState.removeKingsideCastleRight(PC_BLACK);
             }
 
             if (newState.canQueensideCastle(PC_BLACK) &&
                 (move.getFromSquare() == 56 || move.getToSquare() == 56)) {
                 positionHash ^= zobrist::castleRights[3];
-                newState.removeQueensideCastlingRights(PC_BLACK);
+                newState.removeQueensideCastleRights(PC_BLACK);
             }
         }
 
         positionHash ^=
             zobrist::pieceSquare[move.getFromSquare()][getPieceIdx(piece)] ^
             zobrist::pieceSquare[move.getToSquare()][getPieceIdx(piece)];
+        if (move.getToPiece() != P_EMPTY)
+            positionHash ^=
+                zobrist::pieceSquare[move.getToSquare()]
+                                    [getPieceIdx(move.getToPiece())];
 
         board[move.getToSquare()] = piece;
         board[move.getFromSquare()] = P_EMPTY;
@@ -471,19 +468,45 @@ class Board {
         Move move = gameList.back();
         gameList.pop_back();
 
+        auto diff = state.diff(gameStateStack.top());
+        for (int i = 0; i < 4; ++i)
+            if (diff[i]) positionHash ^= zobrist::castleRights[i];
+        if (diff[4]) positionHash ^= zobrist::epSquare[diff[4]];
+
         if (move.isEnpassantCapture()) {
             int offset = sideToMove == PC_WHITE ? -8 : 8;
+            positionHash ^=
+                zobrist::pieceSquare[move.getToSquare() + offset]
+                                    [getPieceIdx(state.epCapturedPiece)];
             board[move.getToSquare() + offset] = state.epCapturedPiece;
         }
+
+        Piece rook = sideToMove == PC_WHITE ? P_WROOK : P_BROOK;
         if (move.isKingSideCastle()) {
+            positionHash ^=
+                zobrist::pieceSquare[move.getToSquare() - 1]
+                                    [getPieceIdx(rook)] ^
+                zobrist::pieceSquare[move.getToSquare() + 1][getPieceIdx(rook)];
             board[move.getToSquare() - 1] = P_EMPTY;
-            board[move.getToSquare() + 1] =
-                sideToMove == PC_WHITE ? P_WROOK : P_BROOK;
+            board[move.getToSquare() + 1] = rook;
         }
         if (move.isQueenSideCastle()) {
+            positionHash ^=
+                zobrist::pieceSquare[move.getToSquare() + 1]
+                                    [getPieceIdx(rook)] ^
+                zobrist::pieceSquare[move.getToSquare() - 2][getPieceIdx(rook)];
             board[move.getToSquare() + 1] = P_EMPTY;
-            board[move.getToSquare() - 2] =
-                sideToMove == PC_WHITE ? P_WROOK : P_BROOK;
+            board[move.getToSquare() - 2] = rook;
+        }
+
+        positionHash ^= zobrist::pieceSquare[move.getFromSquare()]
+                                            [getPieceIdx(move.getFromPiece())] ^
+                        zobrist::pieceSquare[move.getToSquare()]
+                                            [getPieceIdx(move.getFromPiece())];
+        if (move.getToPiece() != P_EMPTY) {
+            positionHash ^=
+                zobrist::pieceSquare[move.getToSquare()]
+                                    [getPieceIdx(move.getToPiece())];
         }
 
         board[move.getFromSquare()] = move.getFromPiece();

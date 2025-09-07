@@ -2,6 +2,9 @@
 #define GAME_STATE_H
 
 #include "Piece.h"
+#include <array>
+
+using std::array;
 
 struct GameState {
   private:
@@ -23,17 +26,27 @@ struct GameState {
         return side == PC_WHITE ? canWhiteQueensideCastle
                                 : canBlackQueensideCastle;
     }
-    void removeKingsideCastlingRights(PieceColor side) {
+    void removeKingsideCastleRight(PieceColor side) {
         if (side == PC_WHITE)
             canWhiteKingsideCastle = false;
         else
             canBlackKingsideCastle = false;
     }
-    void removeQueensideCastlingRights(PieceColor side) {
+    void removeQueensideCastleRights(PieceColor side) {
         if (side == PC_WHITE)
             canWhiteQueensideCastle = false;
         else
             canBlackQueensideCastle = false;
+    }
+
+    // Diffs two gamestates for Zobrist hashing purposes
+    // Non-zero elements indicate differences
+    array<int, 5> diff(const GameState& other) {
+        return {canWhiteKingsideCastle != other.canWhiteKingsideCastle,
+                canWhiteQueensideCastle != other.canWhiteQueensideCastle,
+                canBlackKingsideCastle != other.canBlackKingsideCastle,
+                canBlackQueensideCastle != other.canBlackQueensideCastle,
+                epSquare != other.epSquare ? epSquare : 0};
     }
 };
 
