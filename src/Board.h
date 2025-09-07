@@ -1,10 +1,8 @@
 #ifndef BOARD_H
 #define BOARD_H
 
-#include "GameState.h"
 #include "Graphics.h"
 #include "Move.h"
-#include "MoveParser.h"
 #include "Piece.h"
 #include "Zobrist.h"
 #include <array>
@@ -15,7 +13,7 @@
 #include <unordered_map>
 #include <vector>
 
-using namespace moveparser;
+using namespace moveutils;
 using namespace pieceutils;
 using std::array;
 using std::cout;
@@ -25,9 +23,10 @@ using std::stack;
 using std::unordered_map;
 using std::vector;
 using zobrist::getPieceIdx;
+using zobrist::zhash_t;
 using ui = unsigned int;
-using hash_t = unsigned long long;
 
+namespace {
 constexpr array<int, 120> mailbox{
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
     -1, -1, -1, 0,  1,  2,  3,  4,  5,  6,  7,  -1, -1, 8,  9,  10, 11, 12,
@@ -51,9 +50,62 @@ constexpr array<array<int, 8>, 6> offsets{{{0, 0, 0, 0, 0, 0, 0, 0},
                                            {-10, -1, 1, 10, 0, 0, 0, 0},
                                            {-11, -10, -9, -1, 1, 9, 10, 11},
                                            {-11, -10, -9, -1, 1, 9, 10, 11}}};
+} // namespace
+
+enum GameResult {
+    GR_CONTINUE,
+    GR_CHECKMATE,
+    GR_STALEMATE,
+    GR_3FOLD,
+    GR_50MOVE,
+    GR_INSUFFICIENT // insufficient material
+};
 
 class Board {
   private:
+    struct GameState {
+      private:
+        bool canWhiteQueensideCastle = true;
+        bool canWhiteKingsideCastle = true;
+        bool canBlackQueensideCastle = true;
+        bool canBlackKingsideCastle = true;
+
+      public:
+        Piece epCapturedPiece = P_EMPTY;
+        // NOTE: can optimize this to just track the file
+        int epSquare = -1;
+        int halfmoveClock = 0; // Capture, pawn move, castle
+        bool canKingsideCastle(PieceColor side) const {
+            return side == PC_WHITE ? canWhiteKingsideCastle
+                                    : canBlackKingsideCastle;
+        }
+        bool canQueensideCastle(PieceColor side) const {
+            return side == PC_WHITE ? canWhiteQueensideCastle
+                                    : canBlackQueensideCastle;
+        }
+        void removeKingsideCastleRight(PieceColor side) {
+            if (side == PC_WHITE)
+                canWhiteKingsideCastle = false;
+            else
+                canBlackKingsideCastle = false;
+        }
+        void removeQueensideCastleRights(PieceColor side) {
+            if (side == PC_WHITE)
+                canWhiteQueensideCastle = false;
+            else
+                canBlackQueensideCastle = false;
+        }
+
+        // Diffs two gamestates for Zobrist hashing purposes
+        // Non-zero elements indicate differences
+        array<bool, 4> diff(const GameState& other) {
+            return {canWhiteKingsideCastle != other.canWhiteKingsideCastle,
+                    canWhiteQueensideCastle != other.canWhiteQueensideCastle,
+                    canBlackKingsideCastle != other.canBlackKingsideCastle,
+                    canBlackQueensideCastle != other.canBlackQueensideCastle};
+        }
+    };
+
     PieceColor sideToMove; // 0 = white, 1 = black
     // No piece list for now
     array<Piece, 64> board{
@@ -68,11 +120,12 @@ class Board {
         P_BROOK, P_BKNIGHT, P_BBISHOP, P_BQUEEN, P_BKING, P_BBISHOP, P_BKNIGHT,
         P_BROOK,
     };
+    unordered_map<string, Move> legalMoves;
     vector<Move> gameList;
     stack<GameState> gameStateStack;
-    hash_t positionHash;
+    unordered_map<zhash_t, int> transpositionTable;
+    zhash_t positionHash;
 
-    // TODO: add map of zobrist keys to handle three-fold repetition
     // TODO: handle game end conditions (draw, lose)
 
     bool isAttacked(ui square) {
@@ -327,8 +380,9 @@ class Board {
   public:
     Board() : sideToMove(PC_WHITE) {
         gameStateStack.emplace();
+
         // Initialize Zobrist hash
-        positionHash = zobrist::sideToMove[sideToMove];
+        positionHash = zobrist::whiteToMove;
         for (ui i = 0; i < 4; ++i) {
             positionHash ^= zobrist::castleRights[i];
         }
@@ -339,15 +393,40 @@ class Board {
         for (ui i = 48; i < 64; ++i) {
             positionHash ^= zobrist::pieceSquare[i][getPieceIdx(board[i])];
         }
+
+        transpositionTable[positionHash] = 1;
     }
 
-    void flipSides() { sideToMove = (PieceColor)!sideToMove; }
-
+    void flipSide() {
+        sideToMove = (PieceColor)!sideToMove;
+        positionHash ^= zobrist::whiteToMove;
+        transpositionTable[positionHash]++;
+    }
     PieceColor getSideToPlay() const { return sideToMove; }
+
+    GameResult checkGameResult() {
+        if (legalMoves.size() == 0 && isInCheck()) return GR_CHECKMATE;
+
+        // Threefold repetition
+        if (transpositionTable.count(positionHash) &&
+            transpositionTable.at(positionHash) >= 3)
+            return GR_3FOLD;
+
+        // 50-move rule
+        if (gameStateStack.top().halfmoveClock >= 50) return GR_50MOVE;
+
+        // Stalemate
+        if (legalMoves.size() == 0 && !isInCheck()) return GR_STALEMATE;
+
+        // TODO: check insufficient material
+
+        return GR_CONTINUE;
+    }
 
     // No legality checks for now. Let's assume the move is legal
     void makeMove(const Move& move) {
-        Piece piece;
+        // Distinction between from/to necessary in case of promotion
+        Piece fromPiece, toPiece;
         GameState newState = gameStateStack.top();
 
         if (newState.epSquare != -1) {
@@ -357,7 +436,7 @@ class Board {
 
         if (move.getFromPieceType() == PT_PAWN) {
             newState.halfmoveClock = 0;
-            piece = move.getFromPiece();
+            toPiece = fromPiece = move.getFromPiece();
 
             if (move.isDoublePawnPush()) {
                 newState.epSquare = move.getToSquare();
@@ -375,16 +454,16 @@ class Board {
             }
 
             if (move.isKnightPromotion())
-                piece = sideToMove == PC_WHITE ? P_WKNIGHT : P_BKNIGHT;
+                toPiece = sideToMove == PC_WHITE ? P_WKNIGHT : P_BKNIGHT;
             else if (move.isBishopPromotion())
-                piece = sideToMove == PC_WHITE ? P_WBISHOP : P_BBISHOP;
+                toPiece = sideToMove == PC_WHITE ? P_WBISHOP : P_BBISHOP;
             else if (move.isRookPromotion())
-                piece = sideToMove == PC_WHITE ? P_WROOK : P_BROOK;
+                toPiece = sideToMove == PC_WHITE ? P_WROOK : P_BROOK;
             else if (move.isQueenPromotion())
-                piece = sideToMove == PC_WHITE ? P_WQUEEN : P_BQUEEN;
+                toPiece = sideToMove == PC_WHITE ? P_WQUEEN : P_BQUEEN;
         } else {
             newState.halfmoveClock += 1;
-            piece = move.getFromPiece();
+            toPiece = fromPiece = move.getFromPiece();
 
             if (move.getFromPieceType() == PT_KING) {
                 if (newState.canKingsideCastle(sideToMove)) {
@@ -448,18 +527,19 @@ class Board {
         }
 
         positionHash ^=
-            zobrist::pieceSquare[move.getFromSquare()][getPieceIdx(piece)] ^
-            zobrist::pieceSquare[move.getToSquare()][getPieceIdx(piece)];
-        if (move.getToPiece() != P_EMPTY)
+            zobrist::pieceSquare[move.getFromSquare()][getPieceIdx(fromPiece)] ^
+            zobrist::pieceSquare[move.getToSquare()][getPieceIdx(toPiece)];
+        if (move.isCapture())
             positionHash ^=
                 zobrist::pieceSquare[move.getToSquare()]
                                     [getPieceIdx(move.getToPiece())];
 
-        board[move.getToSquare()] = piece;
+        board[move.getToSquare()] = fromPiece;
         board[move.getFromSquare()] = P_EMPTY;
 
         gameStateStack.push(newState);
         gameList.push_back(move);
+        transpositionTable[positionHash]++;
     }
 
     void unmakeMove() {
@@ -468,10 +548,15 @@ class Board {
         Move move = gameList.back();
         gameList.pop_back();
 
+        // Erase previous move's hash
+        if (--transpositionTable[positionHash] == 0)
+            transpositionTable.erase(positionHash);
+
         auto diff = state.diff(gameStateStack.top());
         for (int i = 0; i < 4; ++i)
             if (diff[i]) positionHash ^= zobrist::castleRights[i];
-        if (diff[4]) positionHash ^= zobrist::epSquare[diff[4]];
+        if (state.epSquare != -1)
+            positionHash ^= zobrist::epSquare[state.epSquare];
 
         if (move.isEnpassantCapture()) {
             int offset = sideToMove == PC_WHITE ? -8 : 8;
@@ -499,11 +584,22 @@ class Board {
             board[move.getToSquare() - 2] = rook;
         }
 
-        positionHash ^= zobrist::pieceSquare[move.getFromSquare()]
-                                            [getPieceIdx(move.getFromPiece())] ^
-                        zobrist::pieceSquare[move.getToSquare()]
-                                            [getPieceIdx(move.getFromPiece())];
-        if (move.getToPiece() != P_EMPTY) {
+        Piece fromPiece = move.getFromPiece();
+        // Handle promotions
+        Piece toPiece = fromPiece;
+        if (move.isKnightPromotion())
+            toPiece = sideToMove == PC_WHITE ? P_WKNIGHT : P_BKNIGHT;
+        else if (move.isBishopPromotion())
+            toPiece = sideToMove == PC_WHITE ? P_WBISHOP : P_BBISHOP;
+        else if (move.isRookPromotion())
+            toPiece = sideToMove == PC_WHITE ? P_WROOK : P_BROOK;
+        else if (move.isQueenPromotion())
+            toPiece = sideToMove == PC_WHITE ? P_WQUEEN : P_BQUEEN;
+
+        positionHash ^=
+            zobrist::pieceSquare[move.getFromSquare()][getPieceIdx(fromPiece)] ^
+            zobrist::pieceSquare[move.getToSquare()][getPieceIdx(toPiece)];
+        if (move.isCapture()) {
             positionHash ^=
                 zobrist::pieceSquare[move.getToSquare()]
                                     [getPieceIdx(move.getToPiece())];
@@ -513,10 +609,11 @@ class Board {
         board[move.getToSquare()] = move.getToPiece();
     }
 
-    // Possible optimization: work with linked list to efficiently remove
+    // Possible optimization: use linked list to efficiently remove
     // illegal moves
-    unordered_map<string, Move> generateMoves() {
-        unordered_map<string, Move> pseudo = generatePseudoLegalMoves();
+    // FIXME: wrong position hash when generating moves for black
+    void generateMoves() {
+        auto pseudo = generatePseudoLegalMoves();
         unordered_map<string, Move> legal;
 
         for (auto& [notation, move] : pseudo) {
@@ -525,9 +622,10 @@ class Board {
             unmakeMove();
         }
 
-        return legal;
+        legalMoves = legal;
     }
 
+    // IO
     void printBoard() {
         cout << graphics::CLEAR << graphics::HOME << '\n';
         int k;
@@ -550,8 +648,7 @@ class Board {
         cout << "    a  b  c  d  e  f  g  h\n";
     }
 
-    Move parseMove(const string& move,
-                   const unordered_map<string, Move>& legalMoves) const {
+    Move parseMove(const string& move) const {
         if (move.size() < 4 || move.size() > 5)
             throw invalid_argument("Invalid input length.");
 

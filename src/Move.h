@@ -9,6 +9,14 @@ using std::string;
 using std::to_string;
 using ui = unsigned int;
 
+namespace moveutils {
+
+ui convertStringToSquare(const string& square) {
+    return 8 * (square[1] - '1') + (square[0] - 'a');
+}
+
+} // namespace moveutils
+
 enum MoveType {
     MT_QUIET = 0b0000,
     MT_DOUBLE_PAWN_PUSH = 0b0001,

@@ -11,32 +11,55 @@ int main() {
     zobrist::init();
 
     Board board;
-    bool validMove;
-    string inputMove;
-    unordered_map<string, Move> legalMoves;
+    bool validMove = false, cont = true;
+    string inputMove, gameMsg;
 
-    // TODO: check for game end conditions
     while (true) {
         board.printBoard();
+        board.generateMoves();
+
+        cont = false;
+        switch (board.checkGameResult()) {
+        case GR_CHECKMATE:
+            gameMsg = "Checkmate, game over!\n";
+            break;
+        case GR_STALEMATE:
+            gameMsg = "Draw by stalemate.\n";
+            break;
+        case GR_50MOVE:
+            gameMsg = "Draw by 50 move rule.\n";
+            break;
+        case GR_3FOLD:
+            gameMsg = "Draw by threefold repetition.\n";
+            break;
+        case GR_INSUFFICIENT:
+            gameMsg = "Draw by insufficient material.\n";
+            break;
+        case GR_CONTINUE:
+            cont = true;
+            break;
+        }
+        if (!cont) {
+            cout << "[GAME] " << gameMsg;
+            break;
+        }
 
         validMove = false;
-        legalMoves = board.generateMoves();
-
         while (!validMove) {
-            cout << "[game] Make your move ("
+            cout << "[GAME] Make your move ("
                  << (board.getSideToPlay() == PC_WHITE ? "white" : "black")
-                 << "): ";
+                 << "):\n[USER] ";
             cin >> inputMove;
             try {
-                Move move = board.parseMove(inputMove, legalMoves);
+                Move move = board.parseMove(inputMove);
                 board.makeMove(move);
                 validMove = true;
             } catch (const invalid_argument& err) {
-                cout << "[game] " << err.what() << "\n";
+                cout << "[GAME] " << err.what() << "\n";
             }
         }
 
-        board.flipSides();
+        board.flipSide();
     }
 
     cout << "Thanks for playing!\n";
