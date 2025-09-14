@@ -397,7 +397,7 @@ class Board {
         transpositionTable[positionHash] = 1;
     }
 
-    void flipSide() {
+    void flip() {
         sideToMove = (PieceColor)!sideToMove;
         positionHash ^= zobrist::whiteToMove;
         transpositionTable[positionHash]++;
@@ -555,8 +555,11 @@ class Board {
         auto diff = state.diff(gameStateStack.top());
         for (int i = 0; i < 4; ++i)
             if (diff[i]) positionHash ^= zobrist::castleRights[i];
+
         if (state.epSquare != -1)
             positionHash ^= zobrist::epSquare[state.epSquare];
+        if (gameStateStack.top().epSquare != -1)
+            positionHash ^= zobrist::epSquare[gameStateStack.top().epSquare];
 
         if (move.isEnpassantCapture()) {
             int offset = sideToMove == PC_WHITE ? -8 : 8;
@@ -611,7 +614,6 @@ class Board {
 
     // Possible optimization: use linked list to efficiently remove
     // illegal moves
-    // FIXME: wrong position hash when generating moves for black
     void generateMoves() {
         auto pseudo = generatePseudoLegalMoves();
         unordered_map<string, Move> legal;
@@ -622,7 +624,7 @@ class Board {
             unmakeMove();
         }
 
-        legalMoves = legal;
+        legalMoves = std::move(legal);
     }
 
     // IO

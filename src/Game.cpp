@@ -59,7 +59,7 @@ int main() {
             }
         }
 
-        board.flipSide();
+        board.flip();
     }
 
     cout << "Thanks for playing!\n";
