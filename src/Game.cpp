@@ -1,6 +1,6 @@
-#include "Board.h"
-#include "Move.h"
-#include "Zobrist.h"
+#include "board/Board.h"
+#include "board/Move.h"
+#include "board/Zobrist.h"
 #include <iostream>
 #include <stdexcept>
 

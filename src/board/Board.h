@@ -1,6 +1,8 @@
 #ifndef BOARD_H
 #define BOARD_H
 
+#define um unordered_map
+
 #include "Graphics.h"
 #include "Move.h"
 #include "Piece.h"
@@ -20,11 +22,11 @@ using std::cout;
 using std::invalid_argument;
 using std::runtime_error;
 using std::stack;
-using std::unordered_map;
+using std::um;
 using std::vector;
 using zobrist::getPieceIdx;
 using zobrist::zhash_t;
-using ui = unsigned int;
+using u32 = unsigned int;
 
 namespace {
 constexpr array<int, 120> mailbox{
@@ -43,7 +45,7 @@ constexpr array<int, 64> mailbox64{
 
 // pawn, knight, bishop, rook, queen, king
 constexpr array<bool, 6> doesSlide{false, false, true, true, true, false};
-constexpr array<ui, 6> numOffsets{0, 8, 4, 4, 8, 8};
+constexpr array<u32, 6> numOffsets{0, 8, 4, 4, 8, 8};
 constexpr array<array<int, 8>, 6> offsets{{{0, 0, 0, 0, 0, 0, 0, 0},
                                            {-21, -19, -12, -8, 8, 12, 19, 21},
                                            {-11, -9, 9, 11, 0, 0, 0, 0},
@@ -120,20 +122,18 @@ class Board {
         P_BROOK, P_BKNIGHT, P_BBISHOP, P_BQUEEN, P_BKING, P_BBISHOP, P_BKNIGHT,
         P_BROOK,
     };
-    unordered_map<string, Move> legalMoves;
+    um<string, Move> legalMoves;
     vector<Move> gameList;
     stack<GameState> gameStateStack;
-    unordered_map<zhash_t, int> transpositionTable;
+    um<zhash_t, int> transpositionTable;
     zhash_t positionHash;
 
-    // TODO: handle game end conditions (draw, lose)
-
-    bool isAttacked(ui square) {
+    bool isAttacked(u32 square) {
         // Superpiece
         int from;
         for (int pieceType = 1; pieceType < 6; ++pieceType) {
-            for (ui j = 0; j < numOffsets[pieceType]; ++j) {
-                for (ui k = 1;; ++k) {
+            for (u32 j = 0; j < numOffsets[pieceType]; ++j) {
+                for (u32 k = 1;; ++k) {
                     from =
                         mailbox[mailbox64[square] + k * offsets[pieceType][j]];
                     // Reached friendly piece or edge of board
@@ -177,7 +177,7 @@ class Board {
 
     bool isInCheck() {
         int kingSquare = -1;
-        for (ui i = 0; i < 64; ++i) {
+        for (u32 i = 0; i < 64; ++i) {
             if ((sideToMove == PC_WHITE && board[i] == P_WKING) ||
                 (sideToMove == PC_BLACK && board[i] == P_BKING)) {
                 kingSquare = i;
@@ -188,15 +188,15 @@ class Board {
         return isAttacked(kingSquare);
     }
 
-    unordered_map<string, Move> generatePseudoLegalMoves() {
-        unordered_map<string, Move> moves;
+    um<string, Move> generatePseudoLegalMoves() {
+        um<string, Move> moves;
 
         // Pawn offsets
         int pushOffset = sideToMove == PC_WHITE ? 10 : -10;
         int leftCaptureOffset = sideToMove == PC_WHITE ? 9 : -11;
         int rightCaptureOffset = sideToMove == PC_WHITE ? 11 : -9;
 
-        for (ui from = 0; from < 64; ++from) {
+        for (u32 from = 0; from < 64; ++from) {
             PieceType pieceType = getPieceType(board[from]);
             if (pieceType == PT_EMPTY) continue;
             if (getPieceColor(board[from]) == sideToMove) {
@@ -291,8 +291,8 @@ class Board {
                         }
                     }
                 } else {
-                    for (ui j = 0; j < numOffsets[pieceType - 1]; ++j) {
-                        for (ui k = 1;; ++k) {
+                    for (u32 j = 0; j < numOffsets[pieceType - 1]; ++j) {
+                        for (u32 k = 1;; ++k) {
                             to = mailbox[mailbox64[from] +
                                          k * offsets[pieceType - 1][j]];
                             if (to == -1) break; // Move would go off the board
@@ -318,7 +318,7 @@ class Board {
                         // squares outside the king's castle path can be
                         // attacked
                         GameState state = gameStateStack.top();
-                        vector<ui> kingSquares;
+                        vector<u32> kingSquares;
                         bool pathEmpty;
 
                         if (state.canKingsideCastle(sideToMove)) {
@@ -383,14 +383,14 @@ class Board {
 
         // Initialize Zobrist hash
         positionHash = zobrist::whiteToMove;
-        for (ui i = 0; i < 4; ++i) {
+        for (u32 i = 0; i < 4; ++i) {
             positionHash ^= zobrist::castleRights[i];
         }
         // Don't include empty squares in hash
-        for (ui i = 0; i < 16; ++i) {
+        for (u32 i = 0; i < 16; ++i) {
             positionHash ^= zobrist::pieceSquare[i][getPieceIdx(board[i])];
         }
-        for (ui i = 48; i < 64; ++i) {
+        for (u32 i = 48; i < 64; ++i) {
             positionHash ^= zobrist::pieceSquare[i][getPieceIdx(board[i])];
         }
 
@@ -445,7 +445,7 @@ class Board {
 
             if (move.isEnpassantCapture()) {
                 int offset = sideToMove == PC_WHITE ? -8 : 8;
-                ui epSquare = move.getToSquare() + offset;
+                u32 epSquare = move.getToSquare() + offset;
                 newState.epCapturedPiece = board[epSquare];
                 board[epSquare] = P_EMPTY;
                 positionHash ^=
@@ -616,7 +616,7 @@ class Board {
     // illegal moves
     void generateMoves() {
         auto pseudo = generatePseudoLegalMoves();
-        unordered_map<string, Move> legal;
+        um<string, Move> legal;
 
         for (auto& [notation, move] : pseudo) {
             makeMove(move);

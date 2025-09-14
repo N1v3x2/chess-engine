@@ -7,11 +7,11 @@
 using pieceutils::getPieceType;
 using std::string;
 using std::to_string;
-using ui = unsigned int;
+using u32 = unsigned int;
 
 namespace moveutils {
 
-ui convertStringToSquare(const string& square) {
+u32 convertStringToSquare(const string& square) {
     return 8 * (square[1] - '1') + (square[0] - 'a');
 }
 
@@ -32,23 +32,23 @@ enum MoveType {
 
 class Move {
   private:
-    ui from, to, flags;
+    u32 from, to, flags;
     Piece fromPiece, toPiece;
 
-    static string getFile(ui square) { return string(1, 'a' + square % 8); }
-    static string getRank(ui square) { return to_string(square / 8 + 1); }
+    static string getFile(u32 square) { return string(1, 'a' + square % 8); }
+    static string getRank(u32 square) { return to_string(square / 8 + 1); }
 
   public:
     Move() : from(0), to(0), flags(0), fromPiece(P_EMPTY), toPiece(P_EMPTY) {}
 
-    Move(ui from, ui to, int flags, Piece p1, Piece p2)
+    Move(u32 from, u32 to, int flags, Piece p1, Piece p2)
         : from(from), to(to), flags(flags), fromPiece(p1), toPiece(p2) {}
 
     Piece getFromPiece() const { return fromPiece; }
     PieceType getFromPieceType() const { return getPieceType(fromPiece); }
     Piece getToPiece() const { return toPiece; }
-    ui getFromSquare() const { return from; }
-    ui getToSquare() const { return to; }
+    u32 getFromSquare() const { return from; }
+    u32 getToSquare() const { return to; }
 
     bool isDoublePawnPush() const { return flags == MT_DOUBLE_PAWN_PUSH; }
     bool isKingSideCastle() const { return flags == MT_CASTLE_KING; }
