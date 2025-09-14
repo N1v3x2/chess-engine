@@ -27,6 +27,7 @@ using std::vector;
 using zobrist::getPieceIdx;
 using zobrist::zhash_t;
 using u32 = unsigned int;
+using u64 = unsigned long long;
 
 namespace {
 constexpr array<int, 120> mailbox{
@@ -396,6 +397,8 @@ class Board {
 
         transpositionTable[positionHash] = 1;
     }
+
+    friend u64 perft(int depth, Board& board);
 
     void flip() {
         sideToMove = (PieceColor)!sideToMove;
