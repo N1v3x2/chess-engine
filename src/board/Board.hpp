@@ -285,14 +285,12 @@ class Board {
                     // En passant
                     int epSquare = gameStateStack.top().epSquare;
                     if (epSquare != -1) {
-                        if (abs(epSquare - (int)from) == 1) {
+                        if (abs(epSquare - (int)from) == 1 &&
+                            epSquare / 8 == from / 8) {
                             to = epSquare + (sideToMove == PC_WHITE ? 8 : -8);
-                            if (mailbox[to] != -1) {
-                                Move m(from, to, MT_CAPTURE_EP, board[from],
-                                       board[epSquare]);
-                                moves.emplace(m.getCoordinateNotation(), m);
-                                // test
-                            }
+                            Move m(from, to, MT_CAPTURE_EP, board[from],
+                                   board[epSquare]);
+                            moves.emplace(m.getCoordinateNotation(), m);
                         }
                     }
                 } else {
@@ -455,10 +453,10 @@ class Board {
                 int offset = sideToMove == PC_WHITE ? -8 : 8;
                 u32 epSquare = move.getToSquare() + offset;
                 newState.epCapturedPiece = board[epSquare];
-                board[epSquare] = P_EMPTY;
                 positionHash ^=
                     zobrist::pieceSquare[epSquare]
                                         [getPieceIdx(board[epSquare])];
+                board[epSquare] = P_EMPTY;
             }
 
             if (move.isKnightPromotion())
