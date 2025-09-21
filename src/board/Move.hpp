@@ -1,7 +1,7 @@
 #ifndef MOVE_H
 #define MOVE_H
 
-#include "Piece.h"
+#include "Piece.hpp"
 #include <string>
 
 using pieceutils::getPieceType;

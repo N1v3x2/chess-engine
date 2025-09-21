@@ -1,7 +1,7 @@
 #ifndef GRAPHICS_H
 #define GRAPHICS_H
 
-#include "Piece.h"
+#include "Piece.hpp"
 #include <string>
 #include <unordered_map>
 

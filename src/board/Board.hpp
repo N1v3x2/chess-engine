@@ -3,13 +3,14 @@
 
 #define um unordered_map
 
-#include "Graphics.h"
-#include "Move.h"
-#include "Piece.h"
-#include "Zobrist.h"
+#include "Graphics.hpp"
+#include "Move.hpp"
+#include "Piece.hpp"
+#include "Zobrist.hpp"
 #include <array>
 #include <cmath>
 #include <iostream>
+#include <map>
 #include <stack>
 #include <stdexcept>
 #include <unordered_map>
@@ -20,6 +21,7 @@ using namespace pieceutils;
 using std::array;
 using std::cout;
 using std::invalid_argument;
+using std::map;
 using std::runtime_error;
 using std::stack;
 using std::um;
@@ -189,8 +191,8 @@ class Board {
         return isAttacked(kingSquare);
     }
 
-    um<string, Move> generatePseudoLegalMoves() {
-        um<string, Move> moves;
+    map<string, Move> generatePseudoLegalMoves() {
+        map<string, Move> moves;
 
         // Pawn offsets
         int pushOffset = sideToMove == PC_WHITE ? 10 : -10;
@@ -281,14 +283,16 @@ class Board {
                     }
 
                     // En passant
-                    if (gameStateStack.top().epSquare != -1) {
-                        int epSquare = gameStateStack.top().epSquare;
-                        if (abs(gameStateStack.top().epSquare - (int)from) ==
-                            1) {
+                    int epSquare = gameStateStack.top().epSquare;
+                    if (epSquare != -1) {
+                        if (abs(epSquare - (int)from) == 1) {
                             to = epSquare + (sideToMove == PC_WHITE ? 8 : -8);
-                            Move m(from, to, MT_CAPTURE_EP, board[from],
-                                   board[epSquare]);
-                            moves.emplace(m.getCoordinateNotation(), m);
+                            if (mailbox[to] != -1) {
+                                Move m(from, to, MT_CAPTURE_EP, board[from],
+                                       board[epSquare]);
+                                moves.emplace(m.getCoordinateNotation(), m);
+                                // test
+                            }
                         }
                     }
                 } else {
@@ -427,6 +431,7 @@ class Board {
     }
 
     // No legality checks for now. Let's assume the move is legal
+    // FIXME: black pawn disappearing
     void makeMove(const Move& move) {
         // Distinction between from/to necessary in case of promotion
         Piece fromPiece, toPiece;
@@ -650,7 +655,7 @@ class Board {
             }
             cout << '\n';
         }
-        cout << "    a  b  c  d  e  f  g  h\n";
+        cout << "    a  b  c  d  e  f  g  h\n\n";
     }
 
     Move parseMove(const string& move) const {

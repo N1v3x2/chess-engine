@@ -1,6 +1,4 @@
-#include "board/Board.h"
-#include "board/Move.h"
-#include "board/Zobrist.h"
+#include "board/Board.hpp"
 #include <iostream>
 #include <stdexcept>
 
@@ -21,7 +19,7 @@ int main() {
         cont = false;
         switch (board.checkGameResult()) {
         case GR_CHECKMATE:
-            gameMsg = "Checkmate, game over!\n";
+            gameMsg = "Checkmate!\n";
             break;
         case GR_STALEMATE:
             gameMsg = "Draw by stalemate.\n";
@@ -40,27 +38,25 @@ int main() {
             break;
         }
         if (!cont) {
-            cout << "[GAME] " << gameMsg;
+            cout << "GAME> " << gameMsg;
             break;
         }
 
         validMove = false;
         while (!validMove) {
-            cout << "[GAME] Make your move ("
+            cout << "GAME> Make your move ("
                  << (board.getSideToPlay() == PC_WHITE ? "white" : "black")
-                 << "):\n[USER] ";
+                 << "):\nPLAYER> ";
             cin >> inputMove;
             try {
                 Move move = board.parseMove(inputMove);
                 board.makeMove(move);
                 validMove = true;
             } catch (const invalid_argument& err) {
-                cout << "[GAME] " << err.what() << "\n";
+                cout << "GAME> " << err.what() << '\n';
             }
         }
 
         board.flip();
     }
-
-    cout << "Thanks for playing!\n";
 }

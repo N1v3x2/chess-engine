@@ -1,5 +1,7 @@
-#include "../src/board/Board.h"
+#include "../src/board/Board.hpp"
+#include <iostream>
 
+using std::cout;
 using u64 = unsigned long long;
 
 u64 perft(int depth, Board& board) {
@@ -9,11 +11,19 @@ u64 perft(int depth, Board& board) {
     auto pseudo = board.generatePseudoLegalMoves();
     for (const auto& [_, move] : pseudo) {
         board.makeMove(move);
-        if (!board.isInCheck()) nodes += perft(depth - 1, board);
+        if (!board.isInCheck()) {
+            board.flip();
+            nodes += perft(depth - 1, board);
+            board.flip();
+        }
         board.unmakeMove();
     }
 
     return nodes;
 }
 
-int main() {}
+int main() {
+    Board board;
+    int depth = 5;
+    cout << "Perft (depth" << depth << "): " << perft(depth, board) << '\n';
+}

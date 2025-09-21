@@ -1,7 +1,7 @@
 #ifndef TRANSPOSITION_TABLE_H
 #define TRANSPOSITION_TABLE_H
 
-#include "Piece.h"
+#include "Piece.hpp"
 #include <array>
 #include <random>
 #include <unordered_map>
