@@ -1,7 +1,7 @@
-#include "../src/board/Board.hpp"
+#include "Board.hpp"
 #include <iostream>
 
-using std::cout;
+using std::cout, std::cin;
 using u64 = unsigned long long;
 
 u64 perft(int depth, Board& board) {
@@ -24,6 +24,8 @@ u64 perft(int depth, Board& board) {
 
 int main() {
     Board board;
-    int depth = 5;
+    int depth;
+    cout << "Depth: ";
+    cin >> depth;
     cout << "Perft (depth" << depth << "): " << perft(depth, board) << '\n';
 }

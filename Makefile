@@ -1,5 +1,5 @@
 CXX=g++
-CXXFLAGS=-std=c++17 -Wall -Wextra -g -O0
+CXXFLAGS=-std=c++17 -Wall -Wextra -g -O0 -Isrc -Isrc/board
 
 SOURCES=$(shell find src -name "*.cpp")
 BUILDDIR=build

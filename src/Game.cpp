@@ -1,4 +1,4 @@
-#include "board/Board.hpp"
+#include "Board.hpp"
 #include <iostream>
 #include <stdexcept>
 
