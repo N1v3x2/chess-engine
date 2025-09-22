@@ -11,6 +11,7 @@
 #include <cmath>
 #include <iostream>
 #include <map>
+#include <sstream>
 #include <stack>
 #include <stdexcept>
 #include <unordered_map>
@@ -20,7 +21,9 @@ using namespace moveutils;
 using namespace pieceutils;
 using std::array;
 using std::cout;
+using std::getline;
 using std::invalid_argument;
+using std::istringstream;
 using std::map;
 using std::runtime_error;
 using std::stack;
@@ -389,7 +392,6 @@ class Board {
         for (u32 i = 0; i < 4; ++i) {
             positionHash ^= zobrist::castleRights[i];
         }
-        // Don't include empty squares in hash
         for (u32 i = 0; i < 16; ++i) {
             positionHash ^= zobrist::pieceSquare[i][getPieceIdx(board[i])];
         }
@@ -400,7 +402,23 @@ class Board {
         transpositionTable[positionHash] = 1;
     }
 
-    friend u64 perft(int depth, Board& board);
+    Board(const string& fen) {
+        istringstream stream(fen);
+
+        string positionFen, line;
+        stream >> positionFen;
+        istringstream posStream(positionFen);
+        for (int rank = 7; rank >= 0; --rank) {
+            getline(posStream, line, '/');
+            if (posStream.fail())
+                throw invalid_argument(
+                    "Not all 8 ranks specified in position FEN.");
+        }
+        if (!posStream.eof())
+            throw invalid_argument("Too many ranks provided in position FEN.");
+    }
+
+    friend u64 perft(int depth, bool listMoves, Board& board);
 
     void flip() {
         sideToMove = (PieceColor)!sideToMove;
@@ -418,7 +436,7 @@ class Board {
             return GR_3FOLD;
 
         // 50-move rule
-        if (gameStateStack.top().halfmoveClock >= 50) return GR_50MOVE;
+        if (gameStateStack.top().halfmoveClock >= 100) return GR_50MOVE;
 
         // Stalemate
         if (legalMoves.size() == 0 && !isInCheck()) return GR_STALEMATE;
@@ -429,7 +447,6 @@ class Board {
     }
 
     // No legality checks for now. Let's assume the move is legal
-    // FIXME: black pawn disappearing
     void makeMove(const Move& move) {
         // Distinction between from/to necessary in case of promotion
         Piece fromPiece, toPiece;
